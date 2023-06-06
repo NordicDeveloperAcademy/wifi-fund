@@ -27,9 +27,9 @@ K_SEM_DEFINE(wifi_connected_sem, 0, 1);
 static struct mqtt_client client;
 
 static struct pollfd fds;
-static struct net_mgmt_event_callback wifi_prov_cb;
+static struct net_mgmt_event_callback wifi_connect_cb;
 
-static int __wifi_args_to_params(struct wifi_connect_req_params *params)
+static int wifi_args_to_params(struct wifi_connect_req_params *params)
 {
 	params->timeout = SYS_FOREVER_MS;
 
@@ -49,7 +49,7 @@ static void wifi_connect_handler(struct net_mgmt_event_callback *cb,
 {
 	switch (mgmt_event) {
 	case NET_EVENT_WIFI_CONNECT_RESULT:
-		LOG_INF("Connected to a Wi-Fi Network");
+		LOG_INF("Connected to Wi-Fi Network: %s", CONFIG_WIFI_SSID);
 		k_sem_give(&wifi_connected_sem);
 		break;
 	default:
@@ -170,7 +170,7 @@ int main(void)
 	/* Sleep to allow initialization of Wi-Fi driver */
 	k_sleep(K_SECONDS(1));
 
-	__wifi_args_to_params(&cnx_params);
+	wifi_args_to_params(&cnx_params);
 
 	if (iface == NULL) {
 		LOG_ERR("Returned network interface is NULL");
@@ -185,10 +185,10 @@ int main(void)
 		return ENOEXEC;
 	}
 
-	net_mgmt_init_event_callback(&wifi_prov_cb,
+	net_mgmt_init_event_callback(&wifi_connect_cb,
 				     wifi_connect_handler,
 				     NET_EVENT_WIFI_CONNECT_RESULT);
-	net_mgmt_add_event_callback(&wifi_prov_cb);
+	net_mgmt_add_event_callback(&wifi_connect_cb);
 
 	LOG_INF("Waiting for Wi-Fi connection");
 	k_sem_take(&wifi_connected_sem, K_FOREVER);
