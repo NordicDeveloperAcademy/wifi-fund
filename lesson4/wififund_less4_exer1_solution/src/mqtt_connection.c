@@ -21,7 +21,7 @@ static uint8_t payload_buf[CONFIG_MQTT_PAYLOAD_BUFFER_SIZE];
 /* MQTT Broker details. */
 static struct sockaddr_storage broker;
 
-LOG_MODULE_DECLARE(MQTT_OVER_WIFI);
+LOG_MODULE_DECLARE(Exercise4_Lesson1);
 
 /**@brief Function to get the payload of recived data.
  */

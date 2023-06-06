@@ -7,7 +7,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <errno.h>
-#include <zephyr/sys/printk.h>
+#include <zephyr/logging/log.h>
 #include <zephyr/kernel.h>
 
 #include <zephyr/net/wifi.h>
@@ -20,27 +20,48 @@
 
 #include "mqtt_connection.h"
 
-LOG_MODULE_REGISTER(MQTT_OVER_WIFI, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(Exercise4_Lesson1, LOG_LEVEL_INF);
 
-/* The mqtt client struct */
+K_SEM_DEFINE(wifi_connected_sem, 0, 1);
+
 static struct mqtt_client client;
-/* File descriptor */
+
 static struct pollfd fds;
 static struct net_mgmt_event_callback wifi_prov_cb;
 
-static void get_wifi_credential(void *cb_arg, const char *ssid, size_t ssid_len)
+static int __wifi_args_to_params(struct wifi_connect_req_params *params)
 {
-struct wifi_credentials_personal config;
+	params->timeout = SYS_FOREVER_MS;
 
-	wifi_credentials_get_by_ssid_personal_struct(ssid, ssid_len, &config);
-	memcpy((struct wifi_credentials_personal *)cb_arg, &config, sizeof(config));
+	params->ssid = CONFIG_WIFI_SSID;
+	params->ssid_length = strlen(params->ssid);
+	params->security = 1;
+	params->psk = CONFIG_WIFI_PASSWORD;
+	params->psk_length = strlen(params->psk);
+	params->channel = WIFI_CHANNEL_ANY;
+	params->mfp = WIFI_MFP_OPTIONAL;
+
+	return 0;
+}
+
+static void wifi_connect_handler(struct net_mgmt_event_callback *cb,
+				    uint32_t mgmt_event, struct net_if *iface)
+{
+	switch (mgmt_event) {
+	case NET_EVENT_WIFI_CONNECT_RESULT:
+		LOG_INF("Connected to a Wi-Fi Network");
+		k_sem_give(&wifi_connected_sem);
+		break;
+	default:
+		break;
+	}
 }
 
 static void button_handler(uint32_t button_state, uint32_t has_changed)
 {
 	switch (has_changed) {
 	case DK_BTN1_MSK:
-	/* STEP 7.2 - When button 1 is pressed, call data_publish() to publish a message */
+	/* STEP 7.2 - When button 1 or 2 is pressed, call data_publish() to publish a message */
 		if (button_state & DK_BTN1_MSK){	
 			int err = data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
 				   CONFIG_BUTTON1_EVENT_PUBLISH_MSG, sizeof(CONFIG_BUTTON1_EVENT_PUBLISH_MSG)-1);
@@ -141,67 +162,40 @@ do_connect:
 	goto do_connect;
 }
 
-static void wifi_connect_handler(struct net_mgmt_event_callback *cb,
-				    uint32_t mgmt_event, struct net_if *iface)
+int main(void)
 {
-	switch (mgmt_event) {
-	case NET_EVENT_WIFI_CONNECT_RESULT:
-		LOG_INF("Connected to a Wi-Fi Network");
-		break;
-	default:
-		break;
-	}
-}
-void main(void)
-{
-	int rc;
-	struct wifi_credentials_personal config = { 0 };
 	struct net_if *iface = net_if_get_default();
-	struct wifi_connect_req_params cnx_params = { 0 };
+	struct wifi_connect_req_params cnx_params;
 
-	/* Sleep 1 seconds to allow initialization of wifi driver. */
+	/* Sleep to allow initialization of Wi-Fi driver */
 	k_sleep(K_SECONDS(1));
 
-	/* Search for stored wifi credential and apply */
-	wifi_credentials_for_each_ssid(get_wifi_credential, &config);
-	LOG_INF("Code stops before configuration found.\n");
-	if (config.header.ssid_len > 0) {
-		LOG_INF("Configuration found. Try to apply.\n");
+	__wifi_args_to_params(&cnx_params);
 
-		cnx_params.ssid = config.header.ssid;
-		cnx_params.ssid_length = config.header.ssid_len;
-		cnx_params.security = config.header.type;
-
-		cnx_params.psk = NULL;
-		cnx_params.psk_length = 0;
-		cnx_params.sae_password = NULL;
-		cnx_params.sae_password_length = 0;
-
-		if (config.header.type != WIFI_SECURITY_TYPE_NONE) {
-			cnx_params.psk = config.password;
-			cnx_params.psk_length = config.password_len;
-		}
-
-		cnx_params.channel = WIFI_CHANNEL_ANY;
-		cnx_params.band = config.header.flags & WIFI_CREDENTIALS_FLAG_5GHz ?
-				WIFI_FREQ_BAND_5_GHZ : WIFI_FREQ_BAND_2_4_GHZ;
-		cnx_params.mfp = WIFI_MFP_OPTIONAL;
-		rc = net_mgmt(NET_REQUEST_WIFI_CONNECT, iface,
-			&cnx_params, sizeof(struct wifi_connect_req_params));
-		if (rc < 0) {
-			LOG_ERR("Cannot apply saved Wi-Fi configuration, err = %d.\n", rc);
-		} else {
-			LOG_INF("Configuration applied.\n");
-		}
+	if (iface == NULL) {
+		LOG_ERR("Returned network interface is NULL");
+		return -1;
 	}
+
+	int err = net_mgmt(NET_REQUEST_WIFI_CONNECT, iface,
+    &cnx_params, sizeof(struct wifi_connect_req_params));
+
+	if (err) {
+		LOG_ERR("Connecting to Wi-Fi failed. error: %d", err);
+		return ENOEXEC;
+	}
+
 	net_mgmt_init_event_callback(&wifi_prov_cb,
 				     wifi_connect_handler,
 				     NET_EVENT_WIFI_CONNECT_RESULT);
-
 	net_mgmt_add_event_callback(&wifi_prov_cb);
+
+	LOG_INF("Waiting for Wi-Fi connection");
+	k_sem_take(&wifi_connected_sem, K_FOREVER);
 	/* Wait for the interface to be up */
 	k_sleep(K_SECONDS(6));
-	LOG_INF("Connecting to MQTT Broker...");
-	/* Connect to MQTT Broker */
+	LOG_INF("Connecting to MQTT Broker");
 	connect_mqtt();
+
+	return 0;
 }
