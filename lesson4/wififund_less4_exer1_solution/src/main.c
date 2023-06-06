@@ -12,8 +12,7 @@
 
 #include <zephyr/net/wifi.h>
 #include <zephyr/net/wifi_mgmt.h>
-#include <net/wifi_credentials.h>
-
+#include <zephyr/net/net_event.h>
 #include <zephyr/net/socket.h>
 #include <zephyr/net/mqtt.h>
 #include <dk_buttons_and_leds.h>

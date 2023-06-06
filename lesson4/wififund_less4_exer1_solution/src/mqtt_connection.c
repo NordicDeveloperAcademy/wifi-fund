@@ -253,7 +253,6 @@ static int broker_init(void)
 
 	addr = result;
 
-	/* Look for address of the broker. */
 	while (addr != NULL) {
 		if (addr->ai_addrlen == sizeof(struct sockaddr_in)) {
 			struct sockaddr_in *server4 = ((struct sockaddr_in *)&broker);
