@@ -164,7 +164,6 @@ void main(void)
 
 	/* Search for stored wifi credential and apply */
 	wifi_credentials_for_each_ssid(get_wifi_credential, &config);
-	LOG_INF("Code stops before configuration found.\n");
 	if (config.header.ssid_len > 0) {
 		LOG_INF("Configuration found. Try to apply.\n");
 
@@ -194,6 +193,7 @@ void main(void)
 			LOG_INF("Configuration applied.\n");
 		}
 	}
+
 	net_mgmt_init_event_callback(&wifi_prov_cb,
 				     wifi_connect_handler,
 				     NET_EVENT_WIFI_CONNECT_RESULT);
