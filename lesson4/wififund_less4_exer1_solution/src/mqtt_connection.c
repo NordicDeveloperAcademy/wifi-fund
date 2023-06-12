@@ -21,7 +21,7 @@ static uint8_t payload_buf[CONFIG_MQTT_PAYLOAD_BUFFER_SIZE];
 /* MQTT Broker details. */
 static struct sockaddr_storage broker;
 
-LOG_MODULE_DECLARE(Exercise4_Lesson1);
+LOG_MODULE_DECLARE(MQTT_OVER_WIFI);
 
 /**@brief Function to get the payload of recived data.
  */
@@ -246,24 +246,25 @@ static int broker_init(void)
 		return -ECHILD;
 	}
 
-	if (result == NULL) {
-		LOG_INF("ERROR: Address not found");
-		return -ENOENT;
-	}
-
 	addr = result;
 
+	/* Look for address of the broker. */
 	while (addr != NULL) {
+		/* IPv4 Address. */
 		if (addr->ai_addrlen == sizeof(struct sockaddr_in)) {
-			struct sockaddr_in *server4 = ((struct sockaddr_in *)&broker);
-
-			server4->sin_addr.s_addr =((struct sockaddr_in *)addr->ai_addr)->sin_addr.s_addr;
-			server4->sin_family = AF_INET;
-			server4->sin_port = htons(CONFIG_MQTT_BROKER_PORT);
-
+			struct sockaddr_in *broker4 =
+				((struct sockaddr_in *)&broker);
 			char ipv4_addr[NET_IPV4_ADDR_LEN];
-			inet_ntop(AF_INET, &server4->sin_addr.s_addr, ipv4_addr, sizeof(ipv4_addr));
-			LOG_INF("IPv4 Address found %s", ipv4_addr);
+
+			broker4->sin_addr.s_addr =
+				((struct sockaddr_in *)addr->ai_addr)
+				->sin_addr.s_addr;
+			broker4->sin_family = AF_INET;
+			broker4->sin_port = htons(CONFIG_MQTT_BROKER_PORT);
+
+			inet_ntop(AF_INET, &broker4->sin_addr.s_addr,
+				  ipv4_addr, sizeof(ipv4_addr));
+			LOG_INF("IPv4 Address found %s", (char *)(ipv4_addr));
 
 			break;
 		} else {
@@ -273,7 +274,6 @@ static int broker_init(void)
 				(unsigned int)sizeof(struct sockaddr_in6));
 		}
 
-		LOG_INF("Looking for next address");
 		addr = addr->ai_next;
 	}
 
@@ -283,6 +283,7 @@ static int broker_init(void)
 	return err;
 }
 
+/* Function to get the client id */
 static const uint8_t* client_id_get(void)
 {
 	static uint8_t client_id[MAX(sizeof(CONFIG_MQTT_CLIENT_ID),
@@ -337,6 +338,7 @@ int client_init(struct mqtt_client *client)
 
 	/* We are not using TLS */
 	client->transport.type = MQTT_TRANSPORT_NON_SECURE;
+
 
 	return err;
 }
