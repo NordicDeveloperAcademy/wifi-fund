@@ -1,0 +1,83 @@
+#
+# Copyright (c) 2022 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+menu "MQTT over Wi-Fi"
+
+module = WIFI_PROVISIONING
+module-str = wifi provisioning service
+source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
+
+config WIFI_PROV_ADV_DATA_UPDATE
+	bool "Enable periodic update of advertisement data"
+	default y
+
+if WIFI_PROV_ADV_DATA_UPDATE
+
+	config WIFI_PROV_ADV_DATA_UPDATE_INTERVAL
+		int "Periodic update interval in second"
+		default 5
+endif # WIFI_PROV_ADV_DATA_UPDATE
+
+config MQTT_PUB_TOPIC
+	string "MQTT publish topic"
+	default "devacademy/publish/topic44"
+
+config MQTT_SUB_TOPIC
+	string "MQTT subscribe topic"
+	default "devacademy/subscribe/topic44"
+
+config MQTT_CLIENT_ID
+	string "MQTT Client ID"
+	help
+	  Use a custom Client ID string.
+	default "nRF7002DK_Test_Ali"
+
+config MQTT_BROKER_HOSTNAME
+	string "MQTT broker hostname"
+	default "test.mosquitto.org"
+
+config MQTT_BROKER_PORT
+	int "MQTT broker port"
+	default 1883
+
+config MQTT_MESSAGE_BUFFER_SIZE
+	int "MQTT message buffer size"
+	default 128
+
+config MQTT_PAYLOAD_BUFFER_SIZE
+	int "MQTT payload buffer size"
+	default 128
+
+config BUTTON1_EVENT_PUBLISH_MSG
+	string "The message to publish on a button event"
+	default "Button 1 Pressed"
+
+config BUTTON2_EVENT_PUBLISH_MSG
+	string "The message to publish on a button event"
+	default "Button 2 Pressed"
+
+config TURN_LED1_ON_CMD
+	string "Command to turn on LED"
+	default "LED1ON"
+
+config TURN_LED1_OFF_CMD
+	string "Command to turn off LED"
+	default "LED1OFF"
+
+config TURN_LED2_ON_CMD
+	string "Command to turn on LED"
+	default "LED2ON"
+
+config TURN_LED2_OFF_CMD
+	string "Command to turn off LED"
+	default "LED2OFF"
+
+
+config MQTT_RECONNECT_DELAY_S
+	int "Seconds to delay before attempting to reconnect to the broker."
+	default 60
+endmenu
+
+source "Kconfig.zephyr"
