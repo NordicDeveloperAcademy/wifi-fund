@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2023 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+ */
 
 #include <stdio.h>
 #include <zephyr/kernel.h>
@@ -15,9 +20,6 @@
 /* STEP x.x - Define the hostname and port for the echo server */
 #define SERVER_HOSTNAME "nordicecho.westeurope.cloudapp.azure.com"
 #define SERVER_PORT "2444"
-
-// #define SERVER_HOSTNAME "tcpbin.com"
-// #define SERVER_PORT "4242"
 
 #define WIFI_SOCKET_MGMT_EVENTS (NET_EVENT_WIFI_CONNECT_RESULT | \
 		    NET_EVENT_WIFI_DISCONNECT_RESULT)
@@ -82,7 +84,7 @@ static int server_resolve(void)
 static int server_connect(void)
 {
 	int err;
-	/* STEP x.x - Create a TCP socket */
+	/* STEP x.x - Create an UDP socket */
 	//sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_TCP);
 	sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if (sock < 0) {
@@ -158,47 +160,40 @@ static void wifi_register_cb(void)
 	net_mgmt_add_event_callback(&net_mgmt_ipv4_callback);
 }
 
-static int __wifi_args_to_params(struct wifi_connect_req_params *params)
+static int wifi_args_to_params(struct wifi_connect_req_params *params)
 {
-	params->timeout = SYS_FOREVER_MS;
-
 	/* SSID */
-	params->ssid = CONFIG_SOCKET_SAMPLE_SSID;
+	params->ssid = CONFIG_WIFI_CREDENTIALS_STATIC_SSID;
 	params->ssid_length = strlen(params->ssid);
 
-#if defined(CONFIG_STA_KEY_MGMT_WPA2)
-	params->security = 1;
-#elif defined(CONFIG_STA_KEY_MGMT_WPA2_256)
-	params->security = 2;
-#elif defined(CONFIG_STA_KEY_MGMT_WPA3)
-	params->security = 3;
-#else
-	params->security = 0;
-#endif
-
-#if !defined(CONFIG_STA_KEY_MGMT_NONE)
-	params->psk = CONFIG_SOCKET_SAMPLE_PASSWORD;
+	params->psk = CONFIG_WIFI_CREDENTIALS_STATIC_PASSWORD;
 	params->psk_length = strlen(params->psk);
-#endif
-	params->channel = WIFI_CHANNEL_ANY;
 
-	/* MFP (optional) */
+	/* 
+	 * Security levels
+	 * None = 0
+	 * WPA2 = 1
+	 * WPA2_256 = 2
+	 * WPA3 = 3
+	 */
+	params->security = 1;
+	params->channel = WIFI_CHANNEL_ANY;
 	params->mfp = WIFI_MFP_OPTIONAL;
+	params->timeout = SYS_FOREVER_MS;
 
 	return 0;
 }
 
 int wifi_connect(void)
 {
+	static struct wifi_connect_req_params cnx_params;
 	struct net_if *iface = net_if_get_default();
-    static struct wifi_connect_req_params cnx_params;
-
-	__wifi_args_to_params(&cnx_params);
-
 	if (iface == NULL) {
 		LOG_ERR("Returned network interface is NULL");
 		return -1;
 	}
+
+	wifi_args_to_params(&cnx_params);
 
 	int err = net_mgmt(NET_REQUEST_WIFI_CONNECT, iface,
     				   &cnx_params, sizeof(struct wifi_connect_req_params));
@@ -235,7 +230,7 @@ void main(void)
 		LOG_ERR("Failed to initialize the LED library");
 	}
 
-	/* To give it time for the wlan0 interface to start up */
+	/* To the wlan0 interface time to start up */
 	k_sleep(K_SECONDS(1));
 	wifi_register_cb();
 
