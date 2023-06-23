@@ -60,7 +60,7 @@ static int get_received_payload(struct mqtt_client *c, size_t length)
 
 /**@brief Function to subscribe to the configured topic
  */
-
+/* STEP 4 - Define the function subscribe() to subscribe to a specific topic.  */
 static int subscribe(struct mqtt_client *const c)
 {
 	struct mqtt_topic subscribe_topic = {
@@ -96,6 +96,7 @@ static void data_print(uint8_t *prefix, uint8_t *data, size_t len)
 
 /**@brief Function to publish data on the configured topic
  */
+/* STEP 7.1 - Define the function data_publish() to publish data */
 int data_publish(struct mqtt_client *c, enum mqtt_qos qos,
 	uint8_t *data, size_t len)
 {
@@ -126,6 +127,7 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 
 	switch (evt->type) {
 	case MQTT_EVT_CONNACK:
+	/* STEP 5 - Subscribe to the topic CONFIG_MQTT_SUB_TOPIC when we have a successful connection */
 		if (evt->result != 0) {
 			LOG_ERR("MQTT connect failed: %d", evt->result);
 			break;
@@ -140,7 +142,9 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 		break;
 
 	case MQTT_EVT_PUBLISH:
+	/* STEP 6 - Listen to published messages received from the broker and extract the message */
 	{
+		/* STEP 6.1 - Extract the payload */
 		const struct mqtt_publish_param *p = &evt->param.publish;
 		//Print the length of the recived message 
 		LOG_INF("MQTT PUBLISH result=%d len=%d",
@@ -159,6 +163,7 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 			mqtt_publish_qos1_ack(c, &ack);
 		}
 
+	/* STEP 6.2 - On successful extraction of data */
 		if (err >= 0) {
 			data_print("Received: ", payload_buf, p->message.payload.len);
 			// Control LED1 and LED2 
@@ -175,6 +180,7 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 				dk_set_led_off(DK_LED2);
 			}
 
+	/* STEP 6.3 - On failed extraction of data */
 		// Payload buffer is smaller than the received data 
 		} else if (err == -EMSGSIZE) {
 			LOG_ERR("Received payload (%d bytes) is larger than the payload buffer size (%d bytes).",
@@ -301,6 +307,7 @@ exit:
 
 /**@brief Initialize the MQTT client structure
  */
+/* STEP 3 - Define the function client_init() to initialize the MQTT client instance.  */
 int client_init(struct mqtt_client *client)
 {
 	int err;

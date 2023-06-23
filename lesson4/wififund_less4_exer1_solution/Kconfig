@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 #
-menu "Wififund Lesson 4"
+menu "MQTT over Wi-Fi"
 
 module = WIFI_PROVISIONING
 module-str = wifi provisioning service
@@ -54,6 +54,10 @@ config BUTTON1_EVENT_PUBLISH_MSG
 	string "The message to publish on a button event"
 	default "Button 1 Pressed"
 
+config BUTTON2_EVENT_PUBLISH_MSG
+	string "The message to publish on a button event"
+	default "Button 2 Pressed"
+
 config TURN_LED1_ON_CMD
 	string "Command to turn on LED"
 	default "LED1ON"
@@ -61,6 +65,15 @@ config TURN_LED1_ON_CMD
 config TURN_LED1_OFF_CMD
 	string "Command to turn off LED"
 	default "LED1OFF"
+
+config TURN_LED2_ON_CMD
+	string "Command to turn on LED"
+	default "LED2ON"
+
+config TURN_LED2_OFF_CMD
+	string "Command to turn off LED"
+	default "LED2OFF"
+
 
 config MQTT_RECONNECT_DELAY_S
 	int "Seconds to delay before attempting to reconnect to the broker."
