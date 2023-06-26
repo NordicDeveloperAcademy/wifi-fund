@@ -3,22 +3,8 @@
 #
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 #
-menu "MQTT over Wi-Fi"
 
-module = WIFI_PROVISIONING
-module-str = wifi provisioning service
-source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
-
-config WIFI_PROV_ADV_DATA_UPDATE
-	bool "Enable periodic update of advertisement data"
-	default y
-
-if WIFI_PROV_ADV_DATA_UPDATE
-
-	config WIFI_PROV_ADV_DATA_UPDATE_INTERVAL
-		int "Periodic update interval in second"
-		default 5
-endif # WIFI_PROV_ADV_DATA_UPDATE
+menu "Wifi Fund Lesson 4 Exercise 1
 
 config MQTT_PUB_TOPIC
 	string "MQTT publish topic"
@@ -32,7 +18,7 @@ config MQTT_CLIENT_ID
 	string "MQTT Client ID"
 	help
 	  Use a custom Client ID string.
-	default "nRF7002DK_Test_Ali"
+	default "nRF7002DK_test_wifi_fund"
 
 config MQTT_BROKER_HOSTNAME
 	string "MQTT broker hostname"
@@ -73,7 +59,6 @@ config TURN_LED2_ON_CMD
 config TURN_LED2_OFF_CMD
 	string "Command to turn off LED"
 	default "LED2OFF"
-
 
 config MQTT_RECONNECT_DELAY_S
 	int "Seconds to delay before attempting to reconnect to the broker."
