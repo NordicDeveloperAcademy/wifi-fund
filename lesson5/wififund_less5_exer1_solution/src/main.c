@@ -24,8 +24,6 @@ K_SEM_DEFINE(wifi_connected_sem, 0, 1);
 
 #define RECV_BUF_SIZE 2048
 
-#define CONFIG_USE_IPV6 true
-
 static int sock;
 static struct sockaddr_storage server;
 
