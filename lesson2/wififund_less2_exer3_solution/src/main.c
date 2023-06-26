@@ -34,6 +34,7 @@ K_SEM_DEFINE(wifi_connected_sem, 0, 1);
 
 #define ADV_PARAM_UPDATE_DELAY        1
 
+/* STEP 3.2 - Define indexes for accessing prov_svc_data */
 #define ADV_DATA_VERSION_IDX          (BT_UUID_SIZE_128 + 0)
 #define ADV_DATA_FLAG_IDX             (BT_UUID_SIZE_128 + 1)
 #define ADV_DATA_FLAG_PROV_STATUS_BIT BIT(0)
@@ -54,20 +55,26 @@ K_SEM_DEFINE(wifi_connected_sem, 0, 1);
 K_THREAD_STACK_DEFINE(adv_daemon_stack_area, ADV_DAEMON_STACK_SIZE);
 static struct k_work_q adv_daemon_work_q;
 
-static uint8_t device_name[] = {'P', 'V', '0', '0', '0', '0', '0', '0'};
+/* STEP 3.1 Define an array for storing provisioning service data */
 static uint8_t prov_svc_data[] = {BT_UUID_PROV_VAL, 0x00, 0x00, 0x00, 0x00};
 
+/* STEP 4.1 Define a variable for the device name */
+static uint8_t device_name[] = {'P', 'V', '0', '0', '0', '0', '0', '0'};
 
+
+/* STEP 4.2 - Define the data structure for the advertisement packet */
 static const struct bt_data ad[] = {
 	BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
 	BT_DATA_BYTES(BT_DATA_UUID128_ALL, BT_UUID_PROV_VAL),
 	BT_DATA(BT_DATA_NAME_COMPLETE, device_name, sizeof(device_name)),
 };
 
+/* STEP 4.3 - Define the data structure for the scan response packet */
 static const struct bt_data sd[] = {
 	BT_DATA(BT_DATA_SVC_DATA128, prov_svc_data, sizeof(prov_svc_data)),
 };
 
+/* STEP 6 - Define the work structures for updating advertisement parameters and data */
 static struct k_work_delayable update_adv_param_work;
 static struct k_work_delayable update_adv_data_work;
 
@@ -100,15 +107,17 @@ static void wifi_register_cb(void)
 static void update_wifi_status_in_adv(void)
 {
 
-
+	/* STEP 5.1 - Update the firmware version*/
 	prov_svc_data[ADV_DATA_VERSION_IDX] = PROV_SVC_VER;
 
+	/* STEP 5.2 - Update the provisioning state */
 	if (!bt_wifi_prov_state_get()) {
 		prov_svc_data[ADV_DATA_FLAG_IDX] &= ~ADV_DATA_FLAG_PROV_STATUS_BIT;
 	} else {
 		prov_svc_data[ADV_DATA_FLAG_IDX] |= ADV_DATA_FLAG_PROV_STATUS_BIT;
 	}
 
+	/* STEP 5.3 - Update the Wi-Fi connection status*/
 	struct net_if *iface = net_if_get_default();
 	struct wifi_iface_status status = { 0 };
 
@@ -135,6 +144,7 @@ static void connected(struct bt_conn *conn, uint8_t err)
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 	LOG_INF("BT Connected: %s", addr);
 
+	/* STEP 8.1 - Upon a connected event, cancel update_adv_data_work */
 	k_work_cancel_delayable(&update_adv_data_work);
 }
 
@@ -145,6 +155,7 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 	LOG_INF("BT Disconnected: %s (reason 0x%02x).\n", addr, reason);
 
+	/* STEP 8.2 - Upon a disconnected event, reschedule all work items*/
 	k_work_reschedule_for_queue(&adv_daemon_work_q, &update_adv_param_work,
 				K_SECONDS(ADV_PARAM_UPDATE_DELAY));
 	k_work_reschedule_for_queue(&adv_daemon_work_q, &update_adv_data_work, K_NO_WAIT);
@@ -218,7 +229,8 @@ static struct bt_conn_auth_info_cb auth_info_cb_display = {
 };
 
 static void update_adv_data_task(struct k_work *item)
-{
+{	
+	/* STEP 7.2 - Update the advertising and scan response data*/
 	int err;
 
 	update_wifi_status_in_adv();
@@ -232,6 +244,7 @@ static void update_adv_data_task(struct k_work *item)
 
 static void update_adv_param_task(struct k_work *item)
 {
+	/* STEP 7.1 - Stop advertising, then start advertising again */
 	int err;
 
 	err = bt_le_adv_stop();
@@ -268,6 +281,7 @@ static void update_dev_name(struct net_linkaddr *mac_addr)
 	byte_to_hex(&device_name[6], mac_addr->addr[5], 'A');
 }
 
+/* STEP 9.1 - Define the callback function to retrieve stored credentials */
 static void get_wifi_credential(void *cb_arg, const char *ssid, size_t ssid_len)
 {
 	struct wifi_credentials_personal config;
@@ -292,8 +306,9 @@ int main(void)
 		LOG_ERR("Bluetooth init failed (err %d).\n", err);
 		return 0;
 	}
-
 	LOG_INF("Bluetooth initialized.\n");
+
+	/* STEP 10 - Enable the Bluetooth Wi-Fi Provisioning Service */
 	err = bt_wifi_prov_init();
 	if (err == 0) {
 		LOG_INF("Wi-Fi provisioning service starts successfully.\n");
@@ -302,7 +317,8 @@ int main(void)
 		return 0;
 	}
 
-	/* Prepare advertisement data */
+	/* STEP 11.1 Prepare the advertisement data */
+	struct net_if *iface = net_if_get_default();
 	struct net_linkaddr *mac_addr = net_if_get_link_addr(iface);
 	char device_name_str[sizeof(device_name) + 1];
 
@@ -313,6 +329,7 @@ int main(void)
 	memcpy(device_name_str, device_name, sizeof(device_name));
 	bt_set_name(device_name_str);
 
+	/* STEP 11.2 - Start advertising */
 	err = bt_le_adv_start(prov_svc_data[ADV_DATA_FLAG_IDX] & ADV_DATA_FLAG_PROV_STATUS_BIT ?
 		PROV_BT_LE_ADV_PARAM_SLOW : PROV_BT_LE_ADV_PARAM_FAST,
 		ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
@@ -329,18 +346,18 @@ int main(void)
 			K_THREAD_STACK_SIZEOF(adv_daemon_stack_area), ADV_DAEMON_PRIORITY,
 			NULL);
 
+	/* STEP 12 - Initializa all work items to their respective task */
 	k_work_init_delayable(&update_adv_param_work, update_adv_param_task);
 	k_work_init_delayable(&update_adv_data_work, update_adv_data_task);
 	k_work_schedule_for_queue(&adv_daemon_work_q, &update_adv_data_work,
 				K_SECONDS(ADV_DATA_UPDATE_INTERVAL));
 
-	/* Search for stored wifi credential and apply */
+	/* STEP 13.1 Search for stored Wi-FI credentials */
 	struct wifi_credentials_personal config = { 0 };
-	struct net_if *iface = net_if_get_default();
-	struct wifi_connect_req_params cnx_params = { 0 };
-	
 	wifi_credentials_for_each_ssid(get_wifi_credential, &config);
 
+	/* STEP 13.2 Apply stored credentials and request a Wi-FI connection*/
+	struct wifi_connect_req_params cnx_params = { 0 };
 	if (config.header.ssid_len > 0) {
 		LOG_INF("Configuration found. Try to apply.\n");
 
