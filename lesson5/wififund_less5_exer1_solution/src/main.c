@@ -23,11 +23,14 @@ K_SEM_DEFINE(wifi_connected_sem, 0, 1);
 #define HTTP_HOSTNAME "d1jglomgqgmujc.cloudfront.net"
 
 #define RECV_BUF_SIZE 2048
+#define CLIENT_ID_SIZE 36
+#define CLIENT_ID_START 139
 
 static int sock;
 static struct sockaddr_storage server;
 
 static char recv_buf[RECV_BUF_SIZE];
+static char client_id_buf[CLIENT_ID_SIZE];
 
 static struct net_mgmt_event_callback wifi_connect_cb;
 
@@ -140,7 +143,7 @@ static int server_connect(void)
 		return -errno;
 
 	}
-	LOG_INF("Successfully connected to server");
+	LOG_INF("Successfully connected to HTTP server");
 
 	return 0;
 }
@@ -156,6 +159,24 @@ static void response_cb(struct http_response *rsp,
     }
 
     LOG_INF("Response status %s", rsp->http_status);
+}
+
+static void client_id_cb(struct http_response *rsp,
+                        enum http_final_call final_data,
+                        void *user_data)
+{
+    if (final_data == HTTP_DATA_MORE) {
+        LOG_INF("Partial data received (%zd bytes)", rsp->data_len);
+		return;
+    } 
+
+	if (rsp->content_length) {
+		uint8_t * body_data = rsp->body_frag_start;
+		size_t body_len = rsp->body_frag_len;
+		strncpy(client_id_buf, body_data, 36);
+	} else {
+		LOG_INF("Null response received");
+	}
 }
 
 static int client_post_send(void)
@@ -198,11 +219,30 @@ static int client_get_send(void)
 	return ret;
 }
 
+static int client_get_new_id(void){
+	int ret = 0;
+	struct http_request req;
+
+	memset(&req, 0, sizeof(req));
+
+	req.method = HTTP_POST;
+	req.url = "/new";
+	req.host = HTTP_HOSTNAME;
+	req.protocol = "HTTP/1.1";
+	req.response = client_id_cb;
+	req.recv_buf = recv_buf;
+	req.recv_buf_len = sizeof(recv_buf);
+
+	ret = http_client_req(sock, &req, 5000, NULL);
+
+	return ret;
+}
+
 static void button_handler(uint32_t button_state, uint32_t has_changed)
 {
 	/* STEP 10 - Send a GET request or PUT request upon button triggers */
 	if (has_changed & DK_BTN1_MSK && button_state & DK_BTN1_MSK) {
-		client_get_send();
+		client_get_new_id();
 	} else if (has_changed & DK_BTN2_MSK && button_state & DK_BTN2_MSK) {
 		client_post_send();
 	}
@@ -231,6 +271,12 @@ int main(void)
 		LOG_INF("Failed to initialize client");
 		return 0;
 	}
+
+	if (client_get_new_id() < 0) {
+		LOG_INF("Failed to get client ID");
+		return 0;
+	}
+	LOG_INF("Succesfully aquired client ID: %s", client_id_buf);
 
 	while (1) {
 		k_sleep(K_FOREVER);
