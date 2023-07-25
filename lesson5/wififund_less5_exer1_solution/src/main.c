@@ -23,14 +23,14 @@ K_SEM_DEFINE(wifi_connected_sem, 0, 1);
 #define HTTP_HOSTNAME "d1jglomgqgmujc.cloudfront.net"
 
 #define RECV_BUF_SIZE 2048
+
 #define CLIENT_ID_SIZE 36
-#define CLIENT_ID_START 139
 
 static int sock;
 static struct sockaddr_storage server;
 
 static char recv_buf[RECV_BUF_SIZE];
-static char client_id_buf[CLIENT_ID_SIZE];
+static char client_id_buf[CLIENT_ID_SIZE+2];
 
 static struct net_mgmt_event_callback wifi_connect_cb;
 
@@ -154,11 +154,16 @@ static void response_cb(struct http_response *rsp,
 {
     if (final_data == HTTP_DATA_MORE) {
         LOG_INF("Partial data received (%zd bytes)", rsp->data_len);
-    } else if (final_data == HTTP_DATA_FINAL) {
-        LOG_INF("All the data received (%zd bytes)", rsp->data_len);
-    }
+		return;
+    } 
+	
+	LOG_INF("Response status %s", rsp->http_status);
 
-    LOG_INF("Response status %s", rsp->http_status);
+	if (rsp->body_frag_len > 0) {
+		char body_buf[rsp->body_frag_len];
+		strncpy(body_buf, rsp->body_frag_start, rsp->body_frag_len);
+		LOG_INF("Received: %s", body_buf);
+	} 
 }
 
 static void client_id_cb(struct http_response *rsp,
@@ -170,36 +175,42 @@ static void client_id_cb(struct http_response *rsp,
 		return;
     } 
 
-	if (rsp->content_length) {
-		uint8_t * body_data = rsp->body_frag_start;
-		size_t body_len = rsp->body_frag_len;
-		strncpy(client_id_buf, body_data, 36);
-	} else {
+	if (rsp->content_length == 0) {
 		LOG_INF("Null response received");
+		return;
 	}
+	
+	uint8_t * body_data = rsp->body_frag_start;
+	char client_id_buf_tmp[CLIENT_ID_SIZE+1];
+	strncpy(client_id_buf_tmp, body_data, CLIENT_ID_SIZE);
+	client_id_buf_tmp[CLIENT_ID_SIZE]='\0';
+	client_id_buf[0]='/';
+	strcat(client_id_buf,client_id_buf_tmp);
 }
 
-static int client_post_send(void)
+static int client_http_put(void)
 {
 	int ret = 0;
 	struct http_request req;
 
 	memset(&req, 0, sizeof(req));
 
-	req.method = HTTP_POST;
-	req.url = "/";
+	req.method = HTTP_PUT;
+	req.url = client_id_buf;
 	req.host = HTTP_HOSTNAME;
 	req.protocol = "HTTP/1.1";
+	req.payload = "Hello from the nRF7002 DK";
+	req.payload_len = strlen(req.payload);
 	req.response = response_cb;
 	req.recv_buf = recv_buf;
 	req.recv_buf_len = sizeof(recv_buf);
 
-	ret = http_client_req(sock, &req, 5000, "IPv4 POST");
+	ret = http_client_req(sock, &req, 5000, NULL);
 
 	return ret;
 }
 
-static int client_get_send(void)
+static int client_http_get(void)
 {
 	int ret = 0;
 	struct http_request req;
@@ -207,14 +218,14 @@ static int client_get_send(void)
 	memset(&req, 0, sizeof(req));
 
 	req.method = HTTP_GET;
-	req.url = "/";
+	req.url = client_id_buf;
 	req.host = HTTP_HOSTNAME;
 	req.protocol = "HTTP/1.1";
 	req.response = response_cb;
 	req.recv_buf = recv_buf;
 	req.recv_buf_len = sizeof(recv_buf);
 
-	ret = http_client_req(sock, &req, 5000, "IPv4 GET");
+	ret = http_client_req(sock, &req, 5000, NULL);
 
 	return ret;
 }
@@ -242,9 +253,9 @@ static void button_handler(uint32_t button_state, uint32_t has_changed)
 {
 	/* STEP 10 - Send a GET request or PUT request upon button triggers */
 	if (has_changed & DK_BTN1_MSK && button_state & DK_BTN1_MSK) {
-		client_get_new_id();
+		client_http_put();
 	} else if (has_changed & DK_BTN2_MSK && button_state & DK_BTN2_MSK) {
-		client_post_send();
+		client_http_get();
 	}
 }
 
