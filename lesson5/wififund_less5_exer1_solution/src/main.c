@@ -5,6 +5,7 @@
  */
 
 #include <string.h>
+#include <stdio.h>
 #include <zephyr/logging/log.h>
 #include <dk_buttons_and_leds.h>
 
@@ -16,6 +17,7 @@
 #include <zephyr/net/socket.h>
 #include <zephyr/net/http/client.h>
 
+
 LOG_MODULE_REGISTER(Lesson5_Exercise1, LOG_LEVEL_INF);
 K_SEM_DEFINE(wifi_connected_sem, 0, 1);
 
@@ -23,8 +25,9 @@ K_SEM_DEFINE(wifi_connected_sem, 0, 1);
 #define HTTP_HOSTNAME "d1jglomgqgmujc.cloudfront.net"
 
 #define RECV_BUF_SIZE 2048
-
 #define CLIENT_ID_SIZE 36
+
+static int counter = 0;
 
 static int sock;
 static struct sockaddr_storage server;
@@ -151,12 +154,7 @@ static int server_connect(void)
 static void response_cb(struct http_response *rsp,
                         enum http_final_call final_data,
                         void *user_data)
-{
-    if (final_data == HTTP_DATA_MORE) {
-        LOG_INF("Partial data received (%zd bytes)", rsp->data_len);
-		return;
-    } 
-	
+{	
 	LOG_INF("Response status %s", rsp->http_status);
 
 	if (rsp->body_frag_len > 0) {
@@ -170,19 +168,13 @@ static void client_id_cb(struct http_response *rsp,
                         enum http_final_call final_data,
                         void *user_data)
 {
-    if (final_data == HTTP_DATA_MORE) {
-        LOG_INF("Partial data received (%zd bytes)", rsp->data_len);
-		return;
-    } 
-
 	if (rsp->content_length == 0) {
 		LOG_INF("Null response received");
 		return;
 	}
 	
-	uint8_t * body_data = rsp->body_frag_start;
 	char client_id_buf_tmp[CLIENT_ID_SIZE+1];
-	strncpy(client_id_buf_tmp, body_data, CLIENT_ID_SIZE);
+	strncpy(client_id_buf_tmp, rsp->body_frag_start, CLIENT_ID_SIZE);
 	client_id_buf_tmp[CLIENT_ID_SIZE]='\0';
 	client_id_buf[0]='/';
 	strcat(client_id_buf,client_id_buf_tmp);
@@ -195,18 +187,26 @@ static int client_http_put(void)
 
 	memset(&req, 0, sizeof(req));
 
+	char buffer[12];
+	ret = snprintf(buffer, 12, "%d", counter);
+	if (ret < 0){
+		LOG_INF("Unable to write to buffer, err: %d", ret);
+		return ret;
+	}
+	
 	req.method = HTTP_PUT;
 	req.url = client_id_buf;
 	req.host = HTTP_HOSTNAME;
 	req.protocol = "HTTP/1.1";
-	req.payload = "Hello from the nRF7002 DK";
-	req.payload_len = strlen(req.payload);
+	req.payload = buffer;
+	req.payload_len = sizeof(buffer);
 	req.response = response_cb;
 	req.recv_buf = recv_buf;
 	req.recv_buf_len = sizeof(recv_buf);
 
 	ret = http_client_req(sock, &req, 5000, NULL);
-
+	LOG_INF("HTTP PUT request: %s", buffer);
+	
 	return ret;
 }
 
@@ -226,6 +226,7 @@ static int client_http_get(void)
 	req.recv_buf_len = sizeof(recv_buf);
 
 	ret = http_client_req(sock, &req, 5000, NULL);
+	LOG_INF("HTTP GET request");
 
 	return ret;
 }
@@ -251,9 +252,9 @@ static int client_get_new_id(void){
 
 static void button_handler(uint32_t button_state, uint32_t has_changed)
 {
-	/* STEP 10 - Send a GET request or PUT request upon button triggers */
 	if (has_changed & DK_BTN1_MSK && button_state & DK_BTN1_MSK) {
 		client_http_put();
+		counter++;
 	} else if (has_changed & DK_BTN2_MSK && button_state & DK_BTN2_MSK) {
 		client_http_get();
 	}
