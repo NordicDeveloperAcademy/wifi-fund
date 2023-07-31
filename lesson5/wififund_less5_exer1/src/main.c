@@ -17,25 +17,20 @@
 #include <zephyr/net/socket.h>
 
 /* STEP 1.2 - Include the header file of the HTTP client library */
-#include <zephyr/net/http/client.h>
+
 
 
 LOG_MODULE_REGISTER(Lesson5_Exercise1, LOG_LEVEL_INF);
 K_SEM_DEFINE(wifi_connected_sem, 0, 1);
 
 /* STEP 2 - Define the macros for the HTTP server hostname and port */
-#define HTTP_HOSTNAME "d1jglomgqgmujc.cloudfront.net"
-#define HTTP_PORT 80
+
 
 /* STEP 3 - Declare the necessary buffers for receiving messages */
-#define RECV_BUF_SIZE 2048
-#define CLIENT_ID_SIZE 36
 
-static char recv_buf[RECV_BUF_SIZE];
-static char client_id_buf[CLIENT_ID_SIZE+2];
 
 /* STEP 4 - Define the variable for the counter as 0 */
-static int counter = 0;
+
 
 static int sock;
 static struct sockaddr_storage server;
@@ -163,13 +158,7 @@ static void response_cb(struct http_response *rsp,
                         void *user_data)
 {	
 	/* STEP 9 - Define the callback function to print the body */
-	LOG_INF("Response status %s", rsp->http_status);
 
-	if (rsp->body_frag_len > 0) {
-		char body_buf[rsp->body_frag_len];
-		strncpy(body_buf, rsp->body_frag_start, rsp->body_frag_len);
-		LOG_INF("Received: %s", body_buf);
-	} 
 }
 
 static void client_id_cb(struct http_response *rsp,
@@ -177,16 +166,9 @@ static void client_id_cb(struct http_response *rsp,
                         void *user_data)
 {
 	/* STEP 6.1 - Log the HTTP response status */
-	LOG_INF("Response status %s", rsp->http_status);
-	
-	/* STEP 6.2 - Retrieve and format the client ID */
-	char client_id_buf_tmp[CLIENT_ID_SIZE+1];
-	strncpy(client_id_buf_tmp, rsp->body_frag_start, CLIENT_ID_SIZE);
-	client_id_buf_tmp[CLIENT_ID_SIZE]='\0';
-	client_id_buf[0]='/';
-	strcat(client_id_buf,client_id_buf_tmp);
 
-	LOG_INF("Succesfully aquired client ID: %s", client_id_buf);
+	/* STEP 6.2 - Retrieve and format the client ID */
+
 }
 
 static int client_http_put(void)
@@ -194,29 +176,7 @@ static int client_http_put(void)
 	int ret = 0;
 
 	/* STEP 7 - Define the function to send a PUT request to the HTTP server */
-	struct http_request req;
-	memset(&req, 0, sizeof(req));
 
-	char buffer[12];
-	ret = snprintf(buffer, 12, "%d", counter);
-	if (ret < 0){
-		LOG_INF("Unable to write to buffer, err: %d", ret);
-		return ret;
-	}
-	
-	req.method = HTTP_PUT;
-	req.url = client_id_buf;
-	req.host = HTTP_HOSTNAME;
-	req.protocol = "HTTP/1.1";
-	req.payload = buffer;
-	req.payload_len = sizeof(buffer);
-	req.response = response_cb;
-	req.recv_buf = recv_buf;
-	req.recv_buf_len = sizeof(recv_buf);
-
-	ret = http_client_req(sock, &req, 5000, NULL);
-	LOG_INF("HTTP PUT request: %s", buffer);
-	
 	return ret;
 }
 
@@ -224,20 +184,6 @@ static int client_http_get(void)
 {
 	int ret = 0;
 	/* STEP 8 - Define the function to send a GET request to the HTTP server */
-	struct http_request req;
-
-	memset(&req, 0, sizeof(req));
-
-	req.method = HTTP_GET;
-	req.url = client_id_buf;
-	req.host = HTTP_HOSTNAME;
-	req.protocol = "HTTP/1.1";
-	req.response = response_cb;
-	req.recv_buf = recv_buf;
-	req.recv_buf_len = sizeof(recv_buf);
-
-	ret = http_client_req(sock, &req, 5000, NULL);
-	LOG_INF("HTTP GET request");
 
 	return ret;
 }
@@ -246,20 +192,10 @@ static int client_get_new_id(void){
 	int ret = 0;
 
 	/* STEP 5.1 - Define the structure http_request and fill the block of memory */
-	struct http_request req;
-	memset(&req, 0, sizeof(req));
 
 	/* STEP 5.2 - Populate the http_request structure */
-	req.method = HTTP_POST;
-	req.url = "/new";
-	req.host = HTTP_HOSTNAME;
-	req.protocol = "HTTP/1.1";
-	req.response = client_id_cb;
-	req.recv_buf = recv_buf;
-	req.recv_buf_len = sizeof(recv_buf);
 
 	/* STEP 5.3 - Send the request to the HTTP server */
-	ret = http_client_req(sock, &req, 5000, NULL);
 
 	return ret;
 }
@@ -267,12 +203,7 @@ static int client_get_new_id(void){
 static void button_handler(uint32_t button_state, uint32_t has_changed)
 {
 	/* STEP 10 - Define the button handler to send requests upon button triggers */
-	if (has_changed & DK_BTN1_MSK && button_state & DK_BTN1_MSK) {
-		client_http_put();
-		counter++;
-	} else if (has_changed & DK_BTN2_MSK && button_state & DK_BTN2_MSK) {
-		client_http_get();
-	}
+
 }
 
 int main(void)
@@ -300,10 +231,6 @@ int main(void)
 	}
 
 	/* STEP 11 - Retrieve the client ID upon connection */
-	if (client_get_new_id() < 0) {
-		LOG_INF("Failed to get client ID");
-		return 0;
-	}
 
 	while (1) {
 		k_sleep(K_FOREVER);
