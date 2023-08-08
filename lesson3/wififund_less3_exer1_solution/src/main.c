@@ -14,11 +14,12 @@
 #include <zephyr/net/net_event.h>
 #include <net/wifi_mgmt_ext.h>
 
-/* STEP x.x - Include the header file for the socket API */ 
+/* STEP 2 - Include the header file for the socket API */ 
 #include <zephyr/net/socket.h>
 
 LOG_MODULE_REGISTER(Lesson3_Exercise1, LOG_LEVEL_INF);
 
+/* STEP 3.1 - Define the semaphores */
 K_SEM_DEFINE(wifi_connected_sem, 0, 1);
 K_SEM_DEFINE(ipv4_obtained_sem, 0, 1);
 
@@ -28,7 +29,7 @@ K_SEM_DEFINE(ipv4_obtained_sem, 0, 1);
 #define IPV4_MGMT_EVENTS (NET_EVENT_IPV4_ADDR_ADD | \
 				NET_EVENT_IPV4_ADDR_DEL)
 
-/* STEP x.x - Define the hostname and port for the echo server */
+/* STEP 4 - Define the hostname and port for the echo server */
 #define SERVER_HOSTNAME "nordicecho.westeurope.cloudapp.azure.com"
 #define SERVER_PORT "2444"				
 
@@ -36,11 +37,11 @@ K_SEM_DEFINE(ipv4_obtained_sem, 0, 1);
 #define MESSAGE_TO_SEND "Hello from nRF70 Series"
 #define SSTRLEN(s) (sizeof(s) - 1)
 
-/* STEP x.x - Declare the structure for the socket and server address */
+/* STEP 5.1 - Declare the structure for the socket and server address */
 static int sock;
 static struct sockaddr_storage server;
 
-/* STEP x.x - Declare the buffer for receiving from server */
+/* STEP 5.2 - Declare the buffer for receiving from server */
 static uint8_t recv_buf[MESSAGE_SIZE];
 
 static struct net_mgmt_event_callback wifi_mgmt_cb;
@@ -68,6 +69,7 @@ static void wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb,
 	case NET_EVENT_WIFI_CONNECT_RESULT:
 		LOG_INF("Connected to Wi-Fi Network: %s", CONFIG_WIFI_CREDENTIALS_STATIC_SSID);
         dk_set_led_on(DK_LED1);
+		/* STEP 3.3 - Upon a Wi-Fi connection, give the semaphore */
 		k_sem_give(&wifi_connected_sem);
 		break;
 	case NET_EVENT_WIFI_DISCONNECT_RESULT:
@@ -86,6 +88,7 @@ static void ipv4_mgmt_event_handler(struct net_mgmt_event_callback *cb,
 	switch (event) {
 	case NET_EVENT_IPV4_ADDR_ADD:
 		LOG_INF("IPv4 address acquired");
+		/* STEP 3.4 - Upon acquiring an IPv4 address, give the semaphore */
 		k_sem_give(&ipv4_obtained_sem);
 		break;
 	case NET_EVENT_IPV4_ADDR_DEL:
@@ -121,6 +124,8 @@ static int wifi_connect() {
 		LOG_ERR("Connecting to Wi-Fi failed, err: %d", err);
 		return ENOEXEC;
 	}
+
+	/* STEP 3.2 - Take the semaphores */
 	k_sem_take(&wifi_connected_sem, K_FOREVER);
 	k_sem_take(&ipv4_obtained_sem, K_FOREVER);
 	
@@ -130,7 +135,7 @@ static int wifi_connect() {
 
 static int server_resolve(void)
 {
-	/* STEP x.x - Call getaddrinfo() to get the IP address of the echo server */
+	/* STEP 6.1 - Call getaddrinfo() to get the IP address of the echo server */
 	int err;
 	struct addrinfo *result;
 	struct addrinfo hints = {
@@ -140,16 +145,16 @@ static int server_resolve(void)
 
 	err = getaddrinfo(SERVER_HOSTNAME, SERVER_PORT, &hints, &result);
 	if (err != 0) {
-		LOG_INF("ERROR: getaddrinfo failed %d", err);
+		LOG_INF("getaddrinfo() failed, err: %d", err);
 		return -EIO;
 	}
 
 	if (result == NULL) {
-		LOG_INF("ERROR: Address not found");
+		LOG_INF("Error, address not found");
 		return -ENOENT;
 	}
 
-	/* STEP x.x - Retrieve the relevant information from the result structure */
+	/* STEP 6.2 - Retrieve the relevant information from the result structure */
 	struct sockaddr_in *server4 = ((struct sockaddr_in *)&server); 
 
 	server4->sin_addr.s_addr =
@@ -157,13 +162,13 @@ static int server_resolve(void)
 	server4->sin_family = AF_INET;
 	server4->sin_port = ((struct sockaddr_in *)result->ai_addr)->sin_port;
 
-	/* STEP x.x - Convert the address into a string and print it */
+	/* STEP 6.3 - Convert the address into a string and print it */
 	char ipv4_addr[NET_IPV4_ADDR_LEN];
 	inet_ntop(AF_INET, &server4->sin_addr.s_addr, ipv4_addr,
 		  sizeof(ipv4_addr));
 	LOG_INF("IPv4 Address found %s", ipv4_addr);
 	
-	/* STEP x.x - Free the memory allocated for result */
+	/* STEP 6.4 - Free the memory allocated for result */
 	freeaddrinfo(result);
 
 	return 0;
@@ -172,15 +177,14 @@ static int server_resolve(void)
 static int server_connect(void)
 {
 	int err;
-	/* STEP x.x - Create an UDP socket */
-	//sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_TCP);
+	/* STEP 7 - Create a UDP socket */
 	sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if (sock < 0) {
 		LOG_INF("Failed to create socket, err: %d, %s", errno, strerror(errno));
 		return -errno;
 	}
 
-	/* STEP x.x - Connect the socket to the server */
+	/* STEP 8 - Connect the socket to the server */
 	err = connect(sock, (struct sockaddr *)&server,
 		      sizeof(struct sockaddr_in));
 	if (err < 0) {
@@ -194,7 +198,7 @@ static int server_connect(void)
 
 static void button_handler(uint32_t button_state, uint32_t has_changed)
 {
-	/* STEP x.x - call send() when button 1 is pressed */
+	/* STEP 9 - Send a message every time button 1 is pressed */
 	if (has_changed & DK_BTN1_MSK && button_state & DK_BTN1_MSK) {
 		int err = send(sock, MESSAGE_TO_SEND, SSTRLEN(MESSAGE_TO_SEND), 0);
 		if (err < 0) {
@@ -221,6 +225,7 @@ int main(void)
 		LOG_ERR("Failed to initialize the buttons library");
 	}
 
+	/* STEP 10 - Resolve the server name and connect to the server */
 	if (server_resolve() != 0) {
 		LOG_INF("Failed to resolve server name");
 		return 0;
@@ -234,7 +239,7 @@ int main(void)
 	LOG_INF("Press button 1 on your DK to send your message");
 
 	while (1) {
-		/* STEP x.x - Call recv() to listen to received messages */
+		/* STEP 10 - Listen for incoming messages */
 		received = recv(sock, recv_buf, sizeof(recv_buf) - 1, 0);
 
 	 		if (received < 0) {
