@@ -17,12 +17,20 @@
 /* STEP x.x - Include the header file for the socket API */ 
 #include <zephyr/net/socket.h>
 
+LOG_MODULE_REGISTER(Lesson3_Exercise1, LOG_LEVEL_INF);
+
+K_SEM_DEFINE(wifi_connected_sem, 0, 1);
+K_SEM_DEFINE(ipv4_obtained_sem, 0, 1);
+
+#define WIFI_MGMT_EVENTS (NET_EVENT_WIFI_CONNECT_RESULT | \
+				NET_EVENT_WIFI_DISCONNECT_RESULT)
+
+#define IPV4_MGMT_EVENTS (NET_EVENT_IPV4_ADDR_ADD | \
+				NET_EVENT_IPV4_ADDR_DEL)
+
 /* STEP x.x - Define the hostname and port for the echo server */
 #define SERVER_HOSTNAME "nordicecho.westeurope.cloudapp.azure.com"
-#define SERVER_PORT "2444"
-
-#define WIFI_SOCKET_MGMT_EVENTS (NET_EVENT_WIFI_CONNECT_RESULT | \
-		    NET_EVENT_WIFI_DISCONNECT_RESULT)
+#define SERVER_PORT "2444"				
 
 #define MESSAGE_SIZE 256 
 #define MESSAGE_TO_SEND "Hello from nRF70 Series"
@@ -35,10 +43,90 @@ static struct sockaddr_storage server;
 /* STEP x.x - Declare the buffer for receiving from server */
 static uint8_t recv_buf[MESSAGE_SIZE];
 
-K_SEM_DEFINE(wifi_connected, 0, 1);
-K_SEM_DEFINE(ipv4_obtained, 0, 1);
+static struct net_mgmt_event_callback wifi_mgmt_cb;
+static struct net_mgmt_event_callback ipv4_mgmt_cb;
 
-LOG_MODULE_REGISTER(Lesson3_Exercise1, LOG_LEVEL_INF);
+static int wifi_args_to_params(struct wifi_connect_req_params *params)
+{
+
+	params->ssid = CONFIG_WIFI_CREDENTIALS_STATIC_SSID;
+	params->ssid_length = strlen(params->ssid);
+	params->psk = CONFIG_WIFI_CREDENTIALS_STATIC_PASSWORD;
+	params->psk_length = strlen(params->psk);
+	params->channel = WIFI_CHANNEL_ANY;
+	params->security = 1;
+	params->mfp = WIFI_MFP_OPTIONAL;
+	params->timeout = SYS_FOREVER_MS;
+
+	return 0;
+}
+
+static void wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb,
+				    uint32_t mgmt_event, struct net_if *iface)
+{
+	switch (mgmt_event) {
+	case NET_EVENT_WIFI_CONNECT_RESULT:
+		LOG_INF("Connected to Wi-Fi Network: %s", CONFIG_WIFI_CREDENTIALS_STATIC_SSID);
+        dk_set_led_on(DK_LED1);
+		k_sem_give(&wifi_connected_sem);
+		break;
+	case NET_EVENT_WIFI_DISCONNECT_RESULT:
+		LOG_INF("Disconnected from Wi-Fi Network");
+        dk_set_led_off(DK_LED1);
+		break;		
+	default:
+        LOG_ERR("Unknown event: %d", mgmt_event);
+		break;
+	}
+}
+
+static void ipv4_mgmt_event_handler(struct net_mgmt_event_callback *cb,
+				    uint32_t event, struct net_if *iface)
+{
+	switch (event) {
+	case NET_EVENT_IPV4_ADDR_ADD:
+		LOG_INF("IPv4 address acquired");
+		k_sem_give(&ipv4_obtained_sem);
+		break;
+	case NET_EVENT_IPV4_ADDR_DEL:
+		LOG_INF("IPv4 address lost");
+		break;
+	default:
+		LOG_DBG("Unknown event: 0x%08X", event);
+		return;
+	}
+}
+
+static int wifi_connect() {
+	struct wifi_connect_req_params cnx_params;
+	struct net_if *iface = net_if_get_default();
+	if (iface == NULL) {
+		LOG_ERR("Returned network interface is NULL");
+		return -1;
+	}
+
+	/* Sleep to allow initialization of Wi-Fi driver */
+	k_sleep(K_SECONDS(1));
+
+	net_mgmt_init_event_callback(&wifi_mgmt_cb, wifi_mgmt_event_handler, WIFI_MGMT_EVENTS);
+	net_mgmt_add_event_callback(&wifi_mgmt_cb);
+	net_mgmt_init_event_callback(&ipv4_mgmt_cb, ipv4_mgmt_event_handler, IPV4_MGMT_EVENTS);
+	net_mgmt_add_event_callback(&ipv4_mgmt_cb);
+
+	wifi_args_to_params(&cnx_params);
+
+	LOG_INF("Connecting to Wi-Fi");
+	int err = net_mgmt(NET_REQUEST_WIFI_CONNECT, iface, &cnx_params, sizeof(struct wifi_connect_req_params));
+	if (err) {
+		LOG_ERR("Connecting to Wi-Fi failed, err: %d", err);
+		return ENOEXEC;
+	}
+	k_sem_take(&wifi_connected_sem, K_FOREVER);
+	k_sem_take(&ipv4_obtained_sem, K_FOREVER);
+	
+
+	return 0;
+}
 
 static int server_resolve(void)
 {
@@ -88,7 +176,7 @@ static int server_connect(void)
 	//sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_TCP);
 	sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if (sock < 0) {
-		LOG_ERR("Failed to create socket: %d.", errno);
+		LOG_INF("Failed to create socket, err: %d, %s", errno, strerror(errno));
 		return -errno;
 	}
 
@@ -96,7 +184,7 @@ static int server_connect(void)
 	err = connect(sock, (struct sockaddr *)&server,
 		      sizeof(struct sockaddr_in));
 	if (err < 0) {
-		LOG_ERR("Connect failed : %d", errno);
+		LOG_INF("Connecting to server failed, err: %d, %s", errno, strerror(errno));
 		return -errno;
 	}
 	LOG_INF("Successfully connected to server");
@@ -104,141 +192,30 @@ static int server_connect(void)
 	return 0;
 }
 
-static struct net_mgmt_event_callback mgmt_cb;
-static struct net_mgmt_event_callback net_mgmt_ipv4_callback;
-
-static void wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb,
-			  uint32_t mgmt_event, struct net_if *iface)
-{
-
-    const struct wifi_status *wifi_status = (const struct wifi_status *)cb->info;
-
-	switch (mgmt_event) {
-	case NET_EVENT_WIFI_CONNECT_RESULT:
-		if (wifi_status->status) {
-			LOG_INF("Connection attempt failed, status code: %d", wifi_status->status);
-			return;
-		}
-        LOG_INF("Wi-Fi Connected, waiting for IP address");
-		k_sem_give(&wifi_connected);
-		break;
-	case NET_EVENT_WIFI_DISCONNECT_RESULT:
-		LOG_INF("Disconnected");
-		break;
-	default:
-        LOG_ERR("Unknown event: %d", mgmt_event);
-		break;
-	}
-}
-
-static void ipv4_mgmt_event_handler(struct net_mgmt_event_callback *cb,
-				    uint32_t event, struct net_if *iface)
-{
-	switch (event) {
-	case NET_EVENT_IPV4_ADDR_ADD:
-		LOG_INF("IPv4 address acquired");
-		k_sem_give(&ipv4_obtained);
-		break;
-	case NET_EVENT_IPV4_ADDR_DEL:
-		LOG_INF("IPv4 address lost");
-		break;
-	default:
-		LOG_DBG("Unknown event: 0x%08X", event);
-		return;
-	}
-}
-
-static void wifi_register_cb(void)
-{
-	LOG_INF("Registering wifi events");
-	net_mgmt_init_event_callback(&mgmt_cb,
-				     wifi_mgmt_event_handler, WIFI_SOCKET_MGMT_EVENTS);
-	net_mgmt_add_event_callback(&mgmt_cb);
-	LOG_INF("Registering IPv4 events");
-	net_mgmt_init_event_callback(&net_mgmt_ipv4_callback, ipv4_mgmt_event_handler,
-			     NET_EVENT_IPV4_ADDR_ADD | NET_EVENT_IPV4_ADDR_DEL);
-	net_mgmt_add_event_callback(&net_mgmt_ipv4_callback);
-}
-
-static int wifi_args_to_params(struct wifi_connect_req_params *params)
-{
-	/* SSID */
-	params->ssid = CONFIG_WIFI_CREDENTIALS_STATIC_SSID;
-	params->ssid_length = strlen(params->ssid);
-
-	params->psk = CONFIG_WIFI_CREDENTIALS_STATIC_PASSWORD;
-	params->psk_length = strlen(params->psk);
-
-	/* 
-	 * Security levels
-	 * None = 0
-	 * WPA2 = 1
-	 * WPA2_256 = 2
-	 * WPA3 = 3
-	 */
-	params->security = 1;
-	params->channel = WIFI_CHANNEL_ANY;
-	params->mfp = WIFI_MFP_OPTIONAL;
-	params->timeout = SYS_FOREVER_MS;
-
-	return 0;
-}
-
-int wifi_connect(void)
-{
-	static struct wifi_connect_req_params cnx_params;
-	struct net_if *iface = net_if_get_default();
-	if (iface == NULL) {
-		LOG_ERR("Returned network interface is NULL");
-		return -1;
-	}
-
-	wifi_args_to_params(&cnx_params);
-
-	int err = net_mgmt(NET_REQUEST_WIFI_CONNECT, iface,
-    				   &cnx_params, sizeof(struct wifi_connect_req_params));
-
-	if (err) {
-		LOG_ERR("Connecting to Wi-Fi failed. error: %d", err);
-		return ENOEXEC;
-	}
-
-    LOG_INF("Connection requested");
-    return 0;
-}
-
 static void button_handler(uint32_t button_state, uint32_t has_changed)
 {
-	switch (has_changed) {
-	case DK_BTN1_MSK:
-		/* STEP x.x - call send() when button 1 is pressed */
-		if (button_state & DK_BTN1_MSK){	
-			int err = send(sock, MESSAGE_TO_SEND, SSTRLEN(MESSAGE_TO_SEND), 0);
-			if (err < 0) {
-				LOG_INF("Failed to send message, %d", errno);
-				return;
-			} LOG_INF("Successfully sent message: %s", MESSAGE_TO_SEND);
-		}
-		break;
+	/* STEP x.x - call send() when button 1 is pressed */
+	if (has_changed & DK_BTN1_MSK && button_state & DK_BTN1_MSK) {
+		int err = send(sock, MESSAGE_TO_SEND, SSTRLEN(MESSAGE_TO_SEND), 0);
+		if (err < 0) {
+			LOG_INF("Failed to send message, %d", errno);
+			return;
+		} LOG_INF("Successfully sent message: %s", MESSAGE_TO_SEND);
 	}
+	break;
 }
 
-void main(void)
+int main(void)
 {
 	int received;
+
 	if (dk_leds_init() != 0) {
 		LOG_ERR("Failed to initialize the LED library");
 	}
 
-	/* To the wlan0 interface time to start up */
-	k_sleep(K_SECONDS(1));
-	wifi_register_cb();
-
-	wifi_connect();
-	LOG_INF("Wait for Wi-fi connection");
-	k_sem_take(&wifi_connected, K_FOREVER);
-	LOG_INF("Wait for DHCP");
-	k_sem_take(&ipv4_obtained, K_FOREVER);
+	if (wifi_connect() != 0) {
+		LOG_ERR("Failed to connect to Wi-Fi");
+	}
 
 	if (dk_buttons_init(button_handler) != 0) {
 		LOG_ERR("Failed to initialize the buttons library");
@@ -246,12 +223,12 @@ void main(void)
 
 	if (server_resolve() != 0) {
 		LOG_INF("Failed to resolve server name");
-		return;
+		return 0;
 	}
 	
 	if (server_connect() != 0) {
 		LOG_INF("Failed to initialize client");
-		return;
+		return 0;
 	}
 
 	LOG_INF("Press button 1 on your DK to send your message");
@@ -274,5 +251,6 @@ void main(void)
 	 		LOG_INF("Data received from the server: (%s)", recv_buf);
 			
 	 	}
-	(void)close(sock);
+	close(sock);
+	return 0;
 }
