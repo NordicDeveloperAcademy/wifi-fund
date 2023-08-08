@@ -166,7 +166,7 @@ static int server_resolve(void)
 	char ipv4_addr[NET_IPV4_ADDR_LEN];
 	inet_ntop(AF_INET, &server4->sin_addr.s_addr, ipv4_addr,
 		  sizeof(ipv4_addr));
-	LOG_INF("IPv4 Address found %s", ipv4_addr);
+	LOG_INF("IPv4 address of server found %s", ipv4_addr);
 	
 	/* STEP 6.4 - Free the memory allocated for result */
 	freeaddrinfo(result);
@@ -206,7 +206,6 @@ static void button_handler(uint32_t button_state, uint32_t has_changed)
 			return;
 		} LOG_INF("Successfully sent message: %s", MESSAGE_TO_SEND);
 	}
-	break;
 }
 
 int main(void)
