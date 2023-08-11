@@ -394,19 +394,6 @@ int client_init(struct mqtt_client *client)
 	return err;
 }
 
-int fds_init(struct mqtt_client *c, struct pollfd *fds)
-{
-	if (c->transport.type == MQTT_TRANSPORT_NON_SECURE) {
-		fds->fd = c->transport.tcp.sock;
-	} else {
-		return -ENOTSUP;
-	}
-
-	fds->events = POLLIN;
-
-	return 0;
-}
-
 static void button_handler(uint32_t button_state, uint32_t has_changed)
 {
 	if (has_changed & DK_BTN1_MSK && button_state & DK_BTN1_MSK) {
