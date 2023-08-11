@@ -6,25 +6,55 @@
 #include <zephyr/types.h>
 #include <stddef.h>
 #include <string.h>
+#include <stdio.h>
 #include <errno.h>
-#include <zephyr/sys/printk.h>
 #include <zephyr/kernel.h>
-
-#include <zephyr/net/wifi.h>
-#include <zephyr/net/wifi_mgmt.h>
-
-#include <zephyr/net/socket.h>
-#include <zephyr/net/mqtt.h>
+#include <zephyr/random/rand32.h>
+#include <zephyr/logging/log.h>
 #include <dk_buttons_and_leds.h>
 
-#include "mqtt_connection.h"
+#include <zephyr/net/net_mgmt.h>
+#include <zephyr/net/net_event.h>
+#include <zephyr/net/wifi_mgmt.h>
+#include <zephyr/net/socket.h>
+#include <zephyr/net/mqtt.h>
+
+/* STEP x.x - */
+#include <zephyr/net/tls_credentials.h>
+
+/* STEP x.x - Include the certificate */
+//#include "certificate.h"
+
+static const unsigned char ca_certificate[] = {
+#include "ca-cert.pem"
+};
 
 LOG_MODULE_REGISTER(Lesson4_Exercise2, LOG_LEVEL_INF);
-K_SEM_DEFINE(wifi_connected_sem, 0, 1);
 
+K_SEM_DEFINE(wifi_connected_sem, 0, 1);
+K_SEM_DEFINE(ipv4_obtained_sem, 0, 1);
+
+#define WIFI_MGMT_EVENTS (NET_EVENT_WIFI_CONNECT_RESULT | \
+				NET_EVENT_WIFI_DISCONNECT_RESULT)
+
+#define IPV4_MGMT_EVENTS (NET_EVENT_IPV4_ADDR_ADD | \
+				NET_EVENT_IPV4_ADDR_DEL)
+
+#define MQTT_CLIENT_ID "WiFi_Fund_Course_Less4Exer2"
+#define CLIENT_ID_LEN sizeof(CONFIG_BOARD) + 11
+
+#define MQTT_TLS_SEC_TAG 24
+
+static struct net_mgmt_event_callback wifi_mgmt_cb;
+static struct net_mgmt_event_callback ipv4_mgmt_cb;
+
+static uint8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
+static uint8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
+static uint8_t payload_buf[CONFIG_MQTT_PAYLOAD_BUFFER_SIZE];
+
+static struct sockaddr_storage server;
 static struct mqtt_client client;
 static struct pollfd fds;
-static struct net_mgmt_event_callback wifi_connect_cb;
 
 static int wifi_args_to_params(struct wifi_connect_req_params *params)
 {
@@ -41,7 +71,7 @@ static int wifi_args_to_params(struct wifi_connect_req_params *params)
 	return 0;
 }
 
-static void wifi_connect_handler(struct net_mgmt_event_callback *cb,
+static void wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb,
 				    uint32_t mgmt_event, struct net_if *iface)
 {
 	switch (mgmt_event) {
@@ -50,13 +80,33 @@ static void wifi_connect_handler(struct net_mgmt_event_callback *cb,
         dk_set_led_on(DK_LED1);
 		k_sem_give(&wifi_connected_sem);
 		break;
+	case NET_EVENT_WIFI_DISCONNECT_RESULT:
+		LOG_INF("Disconnected from Wi-Fi Network");
+        dk_set_led_off(DK_LED1);
+		break;		
 	default:
+        LOG_ERR("Unknown event: %d", mgmt_event);
 		break;
 	}
 }
 
-static int wifi_connect() 
+static void ipv4_mgmt_event_handler(struct net_mgmt_event_callback *cb,
+				    uint32_t event, struct net_if *iface)
 {
+	switch (event) {
+	case NET_EVENT_IPV4_ADDR_ADD:
+		LOG_INF("IPv4 address acquired");
+		k_sem_give(&ipv4_obtained_sem);
+		break;
+	case NET_EVENT_IPV4_ADDR_DEL:
+		LOG_INF("IPv4 address lost");
+		break;
+	default:
+		LOG_DBG("Unknown event: 0x%08X", event);
+		return;
+	}
+}
+static int wifi_connect() {
 	struct wifi_connect_req_params cnx_params;
 	struct net_if *iface = net_if_get_default();
 	if (iface == NULL) {
@@ -67,8 +117,10 @@ static int wifi_connect()
 	/* Sleep to allow initialization of Wi-Fi driver */
 	k_sleep(K_SECONDS(1));
 
-	net_mgmt_init_event_callback(&wifi_connect_cb, wifi_connect_handler, NET_EVENT_WIFI_CONNECT_RESULT);
-	net_mgmt_add_event_callback(&wifi_connect_cb);
+	net_mgmt_init_event_callback(&wifi_mgmt_cb, wifi_mgmt_event_handler, WIFI_MGMT_EVENTS);
+	net_mgmt_add_event_callback(&wifi_mgmt_cb);
+	net_mgmt_init_event_callback(&ipv4_mgmt_cb, ipv4_mgmt_event_handler, IPV4_MGMT_EVENTS);
+	net_mgmt_add_event_callback(&ipv4_mgmt_cb);
 
 	wifi_args_to_params(&cnx_params);
 
@@ -78,70 +130,344 @@ static int wifi_connect()
 		LOG_ERR("Connecting to Wi-Fi failed, err: %d", err);
 		return ENOEXEC;
 	}
-	k_sem_take(&wifi_connected_sem, K_FOREVER);
-	k_sleep(K_SECONDS(6));
 
+	k_sem_take(&wifi_connected_sem, K_FOREVER);
+	k_sem_take(&ipv4_obtained_sem, K_FOREVER);
+	
 	return 0;
+}
+
+static int server_resolve(void)
+{
+	int err;
+	struct addrinfo *result;
+	struct addrinfo hints = {
+		.ai_family = AF_INET,
+		.ai_socktype = SOCK_STREAM
+	};
+
+	err = getaddrinfo(CONFIG_MQTT_BROKER_HOSTNAME, NULL, &hints, &result);
+	if (err) {
+		LOG_INF("getaddrinfo failed, err: %d, %s", err, gai_strerror(err));
+		return -ECHILD;
+	}
+
+	if (result == NULL) {
+		LOG_INF("Error, address not found");
+		return -ENOENT;
+	}
+
+	struct sockaddr_in *server4 = ((struct sockaddr_in *)&server);
+	server4->sin_addr.s_addr =
+			((struct sockaddr_in *)result->ai_addr)->sin_addr.s_addr;
+	server4->sin_family = AF_INET;
+	server4->sin_port = htons(CONFIG_MQTT_BROKER_PORT);
+
+	char ipv4_addr[NET_IPV4_ADDR_LEN];
+	inet_ntop(AF_INET, &server4->sin_addr.s_addr, ipv4_addr, 
+		sizeof(ipv4_addr));
+	LOG_INF("IPv4 address of MQTT broker found %s", ipv4_addr);
+	
+	freeaddrinfo(result);
+	return err;
+}
+
+int certificate_provision(void)
+{
+	int err = 0;
+
+
+
+	return err;
+}
+
+static int get_received_payload(struct mqtt_client *c, size_t length)
+{
+	int ret;
+	int err = 0;
+
+	if (length > sizeof(payload_buf)) {
+		err = -EMSGSIZE;
+	}
+
+	/* Truncate payload until it fits in the payload buffer. */
+	while (length > sizeof(payload_buf)) {
+		ret = mqtt_read_publish_payload_blocking(
+				c, payload_buf, (length - sizeof(payload_buf)));
+		if (ret == 0) {
+			return -EIO;
+		} else if (ret < 0) {
+			return ret;
+		}
+
+		length -= ret;
+	}
+
+	ret = mqtt_readall_publish_payload(c, payload_buf, length);
+	if (ret) {
+		return ret;
+	}
+
+	return err;
+}
+
+static int subscribe(struct mqtt_client *const c)
+{
+	/* STEP 3.1 - Declare a variable of type mqtt_topic */
+	struct mqtt_topic subscribe_topic = {
+		.topic = {
+			.utf8 = CONFIG_MQTT_SUB_TOPIC,
+			.size = strlen(CONFIG_MQTT_SUB_TOPIC)
+		},
+		.qos = MQTT_QOS_1_AT_LEAST_ONCE
+	};
+
+	/* STEP 3.2 - Define a subscription list */
+	const struct mqtt_subscription_list subscription_list = {
+		.list = &subscribe_topic,
+		.list_count = 1,
+		.message_id = 1234
+	};
+
+	/* STEP 3.3 - Subscribe to the topics */
+	LOG_INF("Subscribing to %s", CONFIG_MQTT_SUB_TOPIC);
+	return mqtt_subscribe(c, &subscription_list);
+}
+
+static void data_print(uint8_t *prefix, uint8_t *data, size_t len)
+{
+	char buf[len + 1];
+
+	memcpy(buf, data, len);
+	buf[len] = 0;
+	LOG_INF("%s%s", (char *)prefix, (char *)buf);
+}
+
+/* STEP 6 - Define the function to publish data */
+int publish(struct mqtt_client *c, enum mqtt_qos qos,
+	uint8_t *data, size_t len)
+{
+	struct mqtt_publish_param param;
+
+	param.message.topic.qos = qos;
+	param.message.topic.topic.utf8 = CONFIG_MQTT_PUB_TOPIC;
+	param.message.topic.topic.size = strlen(CONFIG_MQTT_PUB_TOPIC);
+	param.message.payload.data = data;
+	param.message.payload.len = len;
+	param.message_id = sys_rand32_get();
+	param.dup_flag = 0;
+	param.retain_flag = 0;
+
+	data_print("Publishing: ", data, len);
+	LOG_INF("to topic: %s len: %u",
+		CONFIG_MQTT_PUB_TOPIC,
+		(unsigned int)strlen(CONFIG_MQTT_PUB_TOPIC));
+
+	return mqtt_publish(c, &param);
+}
+
+void mqtt_evt_handler(struct mqtt_client *const c,
+		      const struct mqtt_evt *evt)
+{
+	int err;
+
+	switch (evt->type) {
+	case MQTT_EVT_CONNACK:
+	/* STEP 4 - Upon a successful connection, subscribe to topics */
+		if (evt->result != 0) {
+			LOG_ERR("MQTT connect failed: %d", evt->result);
+			break;
+		}
+
+		LOG_INF("MQTT client connected");
+		subscribe(c);
+		break;
+
+	case MQTT_EVT_DISCONNECT:
+		LOG_INF("MQTT client disconnected: %d", evt->result);
+		break;
+
+	case MQTT_EVT_PUBLISH:
+		const struct mqtt_publish_param *p = &evt->param.publish;
+		err = get_received_payload(c, p->message.payload.len);
+		if (p->message.topic.qos == MQTT_QOS_1_AT_LEAST_ONCE) {
+			const struct mqtt_puback_param ack = {
+				.message_id = p->message_id
+			};
+			mqtt_publish_qos1_ack(c, &ack);
+		}
+
+		if (err >= 0) {
+			data_print("Received: ", payload_buf, p->message.payload.len);
+			if(strncmp(payload_buf, CONFIG_LED1_ON_CMD, sizeof(CONFIG_LED1_ON_CMD)-1) == 0){
+				dk_set_led_on(DK_LED1);
+			}
+			else if(strncmp(payload_buf,CONFIG_LED1_OFF_CMD,sizeof(CONFIG_LED1_OFF_CMD)-1) == 0){
+				dk_set_led_off(DK_LED1);
+			}
+			else if(strncmp(payload_buf,CONFIG_LED2_ON_CMD,sizeof(CONFIG_LED2_ON_CMD)-1) == 0){
+				dk_set_led_on(DK_LED2);
+			}
+			else if(strncmp(payload_buf,CONFIG_LED2_OFF_CMD,sizeof(CONFIG_LED2_OFF_CMD)-1) == 0){
+				dk_set_led_off(DK_LED2);
+			}
+
+		} else if (err == -EMSGSIZE) {
+			LOG_ERR("Received payload (%d bytes) is larger than the payload buffer size (%d bytes).",
+				p->message.payload.len, sizeof(payload_buf));
+		} else {
+			LOG_ERR("get_received_payload failed: %d", err);
+			LOG_INF("Disconnecting MQTT client...");
+
+			err = mqtt_disconnect(c);
+			if (err) {
+				LOG_ERR("Could not disconnect: %d", err);
+			}
+		}
+	 	break;
+	case MQTT_EVT_PUBACK:
+		if (evt->result != 0) {
+			LOG_ERR("MQTT PUBACK error: %d", evt->result);
+			break;
+		}
+		LOG_INF("PUBACK packet id: %u", evt->param.puback.message_id);
+		break;
+	case MQTT_EVT_SUBACK:
+		if (evt->result != 0) {
+			LOG_ERR("MQTT SUBACK error: %d", evt->result);
+			break;
+		}
+		LOG_INF("SUBACK packet id: %u", evt->param.suback.message_id);
+		break;
+	case MQTT_EVT_PINGRESP:
+		if (evt->result != 0) {
+			LOG_ERR("MQTT PINGRESP error: %d", evt->result);
+		}
+		break;
+	default:
+		LOG_INF("Unhandled MQTT event type: %d", evt->type);
+		break;
+	}
+}
+
+static const uint8_t* client_id_get(void)
+{
+	static uint8_t client_id[MAX(sizeof(MQTT_CLIENT_ID),
+				     CLIENT_ID_LEN)];
+
+	if (strlen(MQTT_CLIENT_ID) > 0) {
+		snprintf(client_id, sizeof(client_id), "%s",
+			 MQTT_CLIENT_ID);
+		goto exit;
+	}
+
+	uint32_t id = sys_rand32_get();
+	snprintf(client_id, sizeof(client_id), "%s-%010u", CONFIG_BOARD, id);
+
+exit:
+	LOG_DBG("client_id = %s", (char *)client_id);
+
+	return client_id;
+}
+
+
+int client_init(struct mqtt_client *client)
+{
+	int err;
+	mqtt_client_init(client);
+
+	err = server_resolve();
+	if (err) {
+		LOG_ERR("Failed to initialize broker connection");
+		return err;
+	}
+
+	client->broker = &server;
+	client->evt_cb = mqtt_evt_handler;
+	client->client_id.utf8 = client_id_get();
+	client->client_id.size = strlen(client->client_id.utf8);
+	client->password = NULL;
+	client->user_name = NULL;
+	client->protocol_version = MQTT_VERSION_3_1_1;
+	client->rx_buf = rx_buffer;
+	client->rx_buf_size = sizeof(rx_buffer);
+	client->tx_buf = tx_buffer;
+	client->tx_buf_size = sizeof(tx_buffer);
+
+	/* STEP 2.5 - Set the transport type to secure */
+	struct mqtt_sec_config *tls_cfg = &(client->transport).tls.config;
+	static sec_tag_t sec_tag_list[] = { MQTT_TLS_SEC_TAG };
+
+	client->transport.type = MQTT_TRANSPORT_SECURE;
+	tls_cfg->peer_verify = TLS_PEER_VERIFY_OPTIONAL;
+	tls_cfg->cipher_list = NULL;
+	tls_cfg->sec_tag_count = ARRAY_SIZE(sec_tag_list);
+	tls_cfg->sec_tag_list = sec_tag_list;
+	tls_cfg->session_cache = TLS_SESSION_CACHE_DISABLED;
+	tls_cfg->hostname = CONFIG_MQTT_BROKER_HOSTNAME;
+	//tls_cfg->set_native_tls = true;
+	
+	return err;
 }
 
 static void button_handler(uint32_t button_state, uint32_t has_changed)
 {
 	if (has_changed & DK_BTN1_MSK && button_state & DK_BTN1_MSK) {
-	/* STEP 7.2 - When button 1 is pressed, call data_publish() to publish a message */	
-		int err = data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-				CONFIG_BUTTON1_EVENT_PUBLISH_MSG, sizeof(CONFIG_BUTTON1_EVENT_PUBLISH_MSG)-1);
+		int err = publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
+				   CONFIG_BUTTON1_MSG, sizeof(CONFIG_BUTTON1_MSG)-1);
 		if (err) {
 			LOG_ERR("Failed to send message, %d", err);
 			return;	
 		}
-	break;
 	} else if (has_changed & DK_BTN2_MSK && button_state & DK_BTN2_MSK) {
-		int err = data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-				CONFIG_BUTTON2_EVENT_PUBLISH_MSG, sizeof(CONFIG_BUTTON2_EVENT_PUBLISH_MSG)-1);
+		int err = publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
+				   CONFIG_BUTTON2_MSG, sizeof(CONFIG_BUTTON2_MSG)-1);
 		if (err) {
 			LOG_ERR("Failed to send message, %d", err);
 			return;	
 		}
 	}
-	break;
 }
 
-static void connect_mqtt(void)
+int main(void)
 {
 	int err;
-	uint32_t connect_attempt = 0;
 
 	if (dk_leds_init() != 0) {
 		LOG_ERR("Failed to initialize the LED library");
+	}
+	
+	if (wifi_connect() != 0) {
+		LOG_ERR("Failed to connect to Wi-Fi");
 	}
 
 	if (dk_buttons_init(button_handler) != 0) {
 		LOG_ERR("Failed to initialize the buttons library");
 	}
+	
+	err = tls_credential_add(MQTT_TLS_SEC_TAG, TLS_CREDENTIAL_CA_CERTIFICATE, ca_certificate, sizeof(ca_certificate));
+	if (err < 0) {
+		LOG_ERR("Failed to add TLS credentials, err: %d", err);
+		return err;
+	}
+
+	LOG_INF("Connecting to MQTT broker");
 
 	err = client_init(&client);
 	if (err) {
 		LOG_ERR("Failed to initialize MQTT client: %d", err);
-		return;
+		return err;
 	}
 
-do_connect:
-	if (connect_attempt++ > 0) {
-		LOG_INF("Reconnecting in %d seconds...",
-			CONFIG_MQTT_RECONNECT_DELAY_S);
-		k_sleep(K_SECONDS(CONFIG_MQTT_RECONNECT_DELAY_S));
-	}
 	err = mqtt_connect(&client);
 	if (err) {
 		LOG_ERR("Error in mqtt_connect: %d", err);
-		goto do_connect;
+		return err;
 	}
 
-	err = fds_init(&client,&fds);
-	if (err) {
-		LOG_ERR("Error in fds_init: %d", err);
-		return;
-	}
+	/* STEP x.x - Update the file descriptor to use the TLS socket */
+	(&fds)->fd = (&client)->transport.tls.sock;
+	(&fds)->events = POLLIN;
 
 	while (1) {
 		err = poll(&fds, 1, mqtt_keepalive_time_left(&client));
@@ -155,7 +481,6 @@ do_connect:
 			LOG_ERR("Error in mqtt_live: %d", err);
 			break;
 		}
-
 		if ((fds.revents & POLLIN) == POLLIN) {
 			err = mqtt_input(&client);
 			if (err != 0) {
@@ -163,12 +488,10 @@ do_connect:
 				break;
 			}
 		}
-
 		if ((fds.revents & POLLERR) == POLLERR) {
 			LOG_ERR("POLLERR");
 			break;
 		}
-
 		if ((fds.revents & POLLNVAL) == POLLNVAL) {
 			LOG_ERR("POLLNVAL");
 			break;
@@ -176,31 +499,9 @@ do_connect:
 	}
 
 	LOG_INF("Disconnecting MQTT client");
-
 	err = mqtt_disconnect(&client);
 	if (err) {
 		LOG_ERR("Could not disconnect MQTT client: %d", err);
+		return err;
 	}
-	goto do_connect;
-}
-
-void main(void)
-{
-	if (dk_leds_init() != 0) {
-		LOG_ERR("Failed to initialize the LED library");
-	}
-	
-	if (wifi_connect() != 0) {
-		LOG_ERR("Failed to connect to Wi-Fi");
-	}
-
-	if (dk_buttons_init(button_handler) != 0) {
-		LOG_ERR("Failed to initialize the buttons library");
-	}
-	
-	LOG_INF("Connecting to MQTT Broker...");
-
-	connect_mqtt();
-
-	return 0;
 }
