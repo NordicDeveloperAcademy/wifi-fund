@@ -19,14 +19,12 @@
 #include <zephyr/net/socket.h>
 #include <zephyr/net/mqtt.h>
 
-/* STEP x.x - */
+/* STEP 1.4 - Include the header file for the TLS credentials library */
 #include <zephyr/net/tls_credentials.h>
 
-/* STEP x.x - Include the certificate */
-//#include "certificate.h"
-
+/* STEP 2.3 - Include the certificate */
 static const unsigned char ca_certificate[] = {
-#include "ca-cert.pem"
+#include "certificate.h"
 };
 
 LOG_MODULE_REGISTER(Lesson4_Exercise2, LOG_LEVEL_INF);
@@ -43,6 +41,7 @@ K_SEM_DEFINE(ipv4_obtained_sem, 0, 1);
 #define MQTT_CLIENT_ID "WiFi_Fund_Course_Less4Exer2"
 #define CLIENT_ID_LEN sizeof(CONFIG_BOARD) + 11
 
+/* STEP 3.1 - Define a macro for the credential security tag */
 #define MQTT_TLS_SEC_TAG 24
 
 static struct net_mgmt_event_callback wifi_mgmt_cb;
@@ -172,15 +171,6 @@ static int server_resolve(void)
 	return err;
 }
 
-int certificate_provision(void)
-{
-	int err = 0;
-
-
-
-	return err;
-}
-
 static int get_received_payload(struct mqtt_client *c, size_t length)
 {
 	int ret;
@@ -213,7 +203,6 @@ static int get_received_payload(struct mqtt_client *c, size_t length)
 
 static int subscribe(struct mqtt_client *const c)
 {
-	/* STEP 3.1 - Declare a variable of type mqtt_topic */
 	struct mqtt_topic subscribe_topic = {
 		.topic = {
 			.utf8 = CONFIG_MQTT_SUB_TOPIC,
@@ -222,14 +211,12 @@ static int subscribe(struct mqtt_client *const c)
 		.qos = MQTT_QOS_1_AT_LEAST_ONCE
 	};
 
-	/* STEP 3.2 - Define a subscription list */
 	const struct mqtt_subscription_list subscription_list = {
 		.list = &subscribe_topic,
 		.list_count = 1,
 		.message_id = 1234
 	};
 
-	/* STEP 3.3 - Subscribe to the topics */
 	LOG_INF("Subscribing to %s", CONFIG_MQTT_SUB_TOPIC);
 	return mqtt_subscribe(c, &subscription_list);
 }
@@ -243,7 +230,6 @@ static void data_print(uint8_t *prefix, uint8_t *data, size_t len)
 	LOG_INF("%s%s", (char *)prefix, (char *)buf);
 }
 
-/* STEP 6 - Define the function to publish data */
 int publish(struct mqtt_client *c, enum mqtt_qos qos,
 	uint8_t *data, size_t len)
 {
@@ -273,7 +259,6 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 
 	switch (evt->type) {
 	case MQTT_EVT_CONNACK:
-	/* STEP 4 - Upon a successful connection, subscribe to topics */
 		if (evt->result != 0) {
 			LOG_ERR("MQTT connect failed: %d", evt->result);
 			break;
@@ -394,18 +379,18 @@ int client_init(struct mqtt_client *client)
 	client->tx_buf = tx_buffer;
 	client->tx_buf_size = sizeof(tx_buffer);
 
-	/* STEP 2.5 - Set the transport type to secure */
+	/* STEP 4 - Set the transport type to secure */
 	struct mqtt_sec_config *tls_cfg = &(client->transport).tls.config;
 	static sec_tag_t sec_tag_list[] = { MQTT_TLS_SEC_TAG };
 
 	client->transport.type = MQTT_TRANSPORT_SECURE;
+	
 	tls_cfg->peer_verify = TLS_PEER_VERIFY_OPTIONAL;
 	tls_cfg->cipher_list = NULL;
 	tls_cfg->sec_tag_count = ARRAY_SIZE(sec_tag_list);
 	tls_cfg->sec_tag_list = sec_tag_list;
 	tls_cfg->session_cache = TLS_SESSION_CACHE_DISABLED;
 	tls_cfg->hostname = CONFIG_MQTT_BROKER_HOSTNAME;
-	//tls_cfg->set_native_tls = true;
 	
 	return err;
 }
@@ -445,6 +430,7 @@ int main(void)
 		LOG_ERR("Failed to initialize the buttons library");
 	}
 	
+	/* STEP 3.2 - Store the credential on the device */
 	err = tls_credential_add(MQTT_TLS_SEC_TAG, TLS_CREDENTIAL_CA_CERTIFICATE, ca_certificate, sizeof(ca_certificate));
 	if (err < 0) {
 		LOG_ERR("Failed to add TLS credentials, err: %d", err);
@@ -465,7 +451,7 @@ int main(void)
 		return err;
 	}
 
-	/* STEP x.x - Update the file descriptor to use the TLS socket */
+	/* STEP 5 - Update the file descriptor to use the TLS socket */
 	(&fds)->fd = (&client)->transport.tls.sock;
 	(&fds)->events = POLLIN;
 
