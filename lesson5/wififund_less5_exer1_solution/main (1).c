@@ -21,15 +21,7 @@
 
 
 LOG_MODULE_REGISTER(Lesson5_Exercise1, LOG_LEVEL_INF);
-
 K_SEM_DEFINE(wifi_connected_sem, 0, 1);
-K_SEM_DEFINE(ipv4_obtained_sem, 0, 1);
-
-#define WIFI_MGMT_EVENTS (NET_EVENT_WIFI_CONNECT_RESULT | \
-				NET_EVENT_WIFI_DISCONNECT_RESULT)
-
-#define IPV4_MGMT_EVENTS (NET_EVENT_IPV4_ADDR_ADD | \
-				NET_EVENT_IPV4_ADDR_DEL)
 
 /* STEP 2 - Define the macros for the HTTP server hostname and port */
 #define HTTP_HOSTNAME "d1jglomgqgmujc.cloudfront.net"
@@ -48,8 +40,9 @@ static int counter = 0;
 static int sock;
 static struct sockaddr_storage server;
 
-static struct net_mgmt_event_callback wifi_mgmt_cb;
-static struct net_mgmt_event_callback ipv4_mgmt_cb;
+
+
+static struct net_mgmt_event_callback wifi_connect_cb;
 
 static int wifi_args_to_params(struct wifi_connect_req_params *params)
 {
@@ -66,7 +59,7 @@ static int wifi_args_to_params(struct wifi_connect_req_params *params)
 	return 0;
 }
 
-static void wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb,
+static void wifi_connect_handler(struct net_mgmt_event_callback *cb,
 				    uint32_t mgmt_event, struct net_if *iface)
 {
 	switch (mgmt_event) {
@@ -75,30 +68,8 @@ static void wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb,
         dk_set_led_on(DK_LED1);
 		k_sem_give(&wifi_connected_sem);
 		break;
-	case NET_EVENT_WIFI_DISCONNECT_RESULT:
-		LOG_INF("Disconnected from Wi-Fi Network");
-        dk_set_led_off(DK_LED1);
-		break;		
 	default:
-        LOG_ERR("Unknown event: %d", mgmt_event);
 		break;
-	}
-}
-
-static void ipv4_mgmt_event_handler(struct net_mgmt_event_callback *cb,
-				    uint32_t event, struct net_if *iface)
-{
-	switch (event) {
-	case NET_EVENT_IPV4_ADDR_ADD:
-		LOG_INF("IPv4 address acquired");
-		k_sem_give(&ipv4_obtained_sem);
-		break;
-	case NET_EVENT_IPV4_ADDR_DEL:
-		LOG_INF("IPv4 address lost");
-		break;
-	default:
-		LOG_DBG("Unknown event: 0x%08X", event);
-		return;
 	}
 }
 
@@ -113,10 +84,8 @@ static int wifi_connect() {
 	/* Sleep to allow initialization of Wi-Fi driver */
 	k_sleep(K_SECONDS(1));
 
-	net_mgmt_init_event_callback(&wifi_mgmt_cb, wifi_mgmt_event_handler, WIFI_MGMT_EVENTS);
-	net_mgmt_add_event_callback(&wifi_mgmt_cb);
-	net_mgmt_init_event_callback(&ipv4_mgmt_cb, ipv4_mgmt_event_handler, IPV4_MGMT_EVENTS);
-	net_mgmt_add_event_callback(&ipv4_mgmt_cb);
+	net_mgmt_init_event_callback(&wifi_connect_cb, wifi_connect_handler, NET_EVENT_WIFI_CONNECT_RESULT);
+	net_mgmt_add_event_callback(&wifi_connect_cb);
 
 	wifi_args_to_params(&cnx_params);
 
@@ -127,8 +96,7 @@ static int wifi_connect() {
 		return ENOEXEC;
 	}
 	k_sem_take(&wifi_connected_sem, K_FOREVER);
-	k_sem_take(&ipv4_obtained_sem, K_FOREVER);
-	
+	k_sleep(K_SECONDS(6));
 
 	return 0;
 }
@@ -174,7 +142,7 @@ static int server_connect(void)
 	int err;
 	sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (sock < 0) {
-		LOG_INF("Failed to create socket, err: %d, %s", errno, strerror(errno));
+		LOG_INF("Failed to set up HTTP socket, err: %d, %s", errno, strerror(errno));
 		return -errno;
 	}
 
@@ -195,7 +163,7 @@ static void response_cb(struct http_response *rsp,
                         void *user_data)
 {	
 	/* STEP 9 - Define the callback function to print the body */
-	LOG_INF("Response status: %s", rsp->http_status);
+	LOG_INF("Response status %s", rsp->http_status);
 
 	if (rsp->body_frag_len > 0) {
 		char body_buf[rsp->body_frag_len];
@@ -209,7 +177,7 @@ static void client_id_cb(struct http_response *rsp,
                         void *user_data)
 {
 	/* STEP 6.1 - Log the HTTP response status */
-	LOG_INF("Response status: %s", rsp->http_status);
+	LOG_INF("Response status %s", rsp->http_status);
 	
 	/* STEP 6.2 - Retrieve and format the client ID */
 	char client_id_buf_tmp[CLIENT_ID_SIZE+1];
@@ -223,43 +191,40 @@ static void client_id_cb(struct http_response *rsp,
 
 static int client_http_put(void)
 {
-	/* STEP 7 - Define the function to send a PUT request to the HTTP server */
-	int err = 0;
-	int bytes_written;
+	int ret = 0;
+	int bytes_writen=0;
 
+	/* STEP 7 - Define the function to send a PUT request to the HTTP server */
 	struct http_request req;
 	memset(&req, 0, sizeof(req));
 
-	char buffer[12] = {0};
-	bytes_written = snprintf(buffer, 12, "%d", counter);
-	if (bytes_written < 0){
-		LOG_INF("Unable to write to buffer, err: %d", bytes_written);
-		return bytes_written;
+	static char buffer[12]= {0};
+	bytes_writen = snprintf(buffer, 12, "%d", counter);
+	if (bytes_writen < 0){
+		LOG_INF("Unable to write to buffer, err: %d", ret);
+		return ret;
 	}
-
+	
 	req.method = HTTP_PUT;
 	req.url = client_id_buf;
 	req.host = HTTP_HOSTNAME;
 	req.protocol = "HTTP/1.1";
 	req.payload = buffer;
-	req.payload_len = bytes_written;
+	req.payload_len = bytes_writen+1;
 	req.response = response_cb;
 	req.recv_buf = recv_buf;
 	req.recv_buf_len = sizeof(recv_buf);
 
+	ret = http_client_req(sock, &req, 5000, NULL);
 	LOG_INF("HTTP PUT request: %s", buffer);
-	err = http_client_req(sock, &req, 5000, NULL);
-	if (err < 0) {
-		LOG_INF("Failed to send HTTP PUT request %s, err: %d", buffer, err);
-	}
 	
-	return err;
+	return ret;
 }
 
 static int client_http_get(void)
 {
+	int ret = 0;
 	/* STEP 8 - Define the function to send a GET request to the HTTP server */
-	int err = 0;
 	struct http_request req;
 
 	memset(&req, 0, sizeof(req));
@@ -272,17 +237,14 @@ static int client_http_get(void)
 	req.recv_buf = recv_buf;
 	req.recv_buf_len = sizeof(recv_buf);
 
+	ret = http_client_req(sock, &req, 5000, NULL);
 	LOG_INF("HTTP GET request");
-	err = http_client_req(sock, &req, 5000, NULL);
-	if (err < 0) {
-		LOG_INF("Failed to send HTTP GET request, err: %d", err);
-	}
-	
-	return err;
+
+	return ret;
 }
 
 static int client_get_new_id(void){
-	int err = 0;
+	int ret = 0;
 
 	/* STEP 5.1 - Define the structure http_request and fill the block of memory */
 	struct http_request req;
@@ -298,9 +260,9 @@ static int client_get_new_id(void){
 	req.recv_buf_len = sizeof(recv_buf);
 
 	/* STEP 5.3 - Send the request to the HTTP server */
-	err = http_client_req(sock, &req, 5000, NULL);
+	ret = http_client_req(sock, &req, 5000, NULL);
 
-	return err;
+	return ret;
 }
 
 static void button_handler(uint32_t button_state, uint32_t has_changed)
@@ -346,7 +308,6 @@ int main(void)
 
 	while (1) {
 		k_sleep(K_FOREVER);
-		
 
 	}
 
