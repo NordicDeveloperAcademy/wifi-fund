@@ -21,12 +21,10 @@
 #include <zephyr/net/http/client.h>
 
 /* STEP 1.3 - Include the header file for the TLS credentials library */
-#include <zephyr/net/tls_credentials.h>
+
 
 /* STEP 2.3 - Include the certificate */
-static const char ca_certificate[] = {
-#include "certificate.h"
-};
+
 
 LOG_MODULE_REGISTER(Lesson5_Exercise2, LOG_LEVEL_INF);
 
@@ -40,11 +38,11 @@ K_SEM_DEFINE(ipv4_obtained_sem, 0, 1);
 				NET_EVENT_IPV4_ADDR_DEL)
 
 /* STEP 4.1 - Define a macro for the credential security tag */
-#define HTTP_TLS_SEC_TAG 1
+
 
 #define HTTP_HOSTNAME "d1jglomgqgmujc.cloudfront.net"
 /* STEP 3 - Change the HTTP port numer */
-#define HTTP_PORT 443
+#define HTTP_PORT 80
 
 #define RECV_BUF_SIZE 2048
 #define CLIENT_ID_SIZE 36
@@ -182,11 +180,7 @@ static int server_connect(void)
 	int err;
 
 	/* STEP 4.2 - Add the credential to the device */
-	err = tls_credential_add(HTTP_TLS_SEC_TAG, TLS_CREDENTIAL_CA_CERTIFICATE, ca_certificate, sizeof(ca_certificate));
-	if (err < 0) {
-		LOG_INF("Failed to add TLS credentials, err: %d", err);
-		return err;
-	}
+
 
 	sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TLS_1_2);
 	if (sock < 0) {
@@ -195,25 +189,12 @@ static int server_connect(void)
 	}
 
 	/* STEP 5.1 - Configure the socket with the security tag for the certificate */
-	sec_tag_t sec_tag_opt[] = { HTTP_TLS_SEC_TAG,	};
-	err = setsockopt(sock, SOL_TLS, TLS_SEC_TAG_LIST, sec_tag_opt, sizeof(sec_tag_opt));
-	if (err < 0)
-	{
-			LOG_ERR("Failed to set TLS security TAG list, err: %d", errno);
-			(void)close(sock);
-			return -errno;
-	}
+
 	/* STEP 5.2 - Configure the socket with the hostname of the HTTP server */
-	err = setsockopt(sock, SOL_TLS, TLS_HOSTNAME, HTTP_HOSTNAME, sizeof(HTTP_HOSTNAME));
-	if (err < 0)
-	{
-			LOG_ERR("Failed to set TLS_HOSTNAME option. Err: %d", errno);
-			(void)close(sock);
-			return -errno;
-	}
+
 
 	/* STEP 5.3 - Log that TLS has been enabled */
-	LOG_INF("TLS enabled");
+
 
 	err = connect(sock, (struct sockaddr *)&server,
 		      sizeof(struct sockaddr_in));
