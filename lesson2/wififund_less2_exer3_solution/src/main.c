@@ -387,6 +387,6 @@ int main(void)
 			LOG_INF("Configuration applied.\n");
 		}
 	}
-	wifi_register_cb(void);
+	wifi_register_cb();
 	k_sem_take(&wifi_connected_sem, K_FOREVER);
 }
