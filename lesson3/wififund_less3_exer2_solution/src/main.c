@@ -16,9 +16,7 @@
 
 /* STEP 2 - Include the header file for the zperf API */ 
 #include <zephyr/net/zperf.h>
-
-
-/* Just for using inet_ntop to print*/
+#include <nrfx_clock.h>
 #include <zephyr/net/socket.h>
 
 LOG_MODULE_REGISTER(Lesson3_Exercise2, LOG_LEVEL_INF);
@@ -33,12 +31,15 @@ K_SEM_DEFINE(ipv4_obtained_sem, 0, 1);
 #define IPV4_MGMT_EVENTS (NET_EVENT_IPV4_ADDR_ADD | \
 				NET_EVENT_IPV4_ADDR_DEL)
 
-#define PEER_IPV4_ADDR "192.168.1.253"
 #define PEER_PORT 5001
-
 #define WIFI_ZPERF_PKT_SIZE 1024
 #define WIFI_ZPERF_RATE 10000
 #define WIFI_TEST_DURATION 20000
+
+static struct sockaddr_in in4_addr_my = {
+	.sin_family = AF_INET,
+	.sin_port = htons(PEER_PORT),
+};
 
 static struct net_mgmt_event_callback wifi_mgmt_cb;
 static struct net_mgmt_event_callback ipv4_mgmt_cb;
@@ -160,6 +161,7 @@ static void udp_upload_results_cb(enum zperf_status status,
 		LOG_INF("%u packets sent", result->nb_packets_sent);
 		LOG_INF("%u packets lost", result->nb_packets_lost);
 		LOG_INF("%u packets received", result->nb_packets_rcvd);
+		LOG_INF("%u kbps",client_rate_in_kbps);
 		k_sem_give(&udp_callback);
 		break;
 	case ZPERF_SESSION_ERROR:
@@ -169,45 +171,49 @@ static void udp_upload_results_cb(enum zperf_status status,
 }
 
 
+static int parse_ipv4_addr(char *host, struct sockaddr_in *addr)
+{
+	int ret;
+	if (!host) {
+		return -EINVAL;
+	}
+
+	ret = net_addr_pton(AF_INET, host, &addr->sin_addr);
+	if (ret < 0) {
+		LOG_ERR("Invalid IPv4 address %s\n", host);
+		return -EINVAL;
+	}
+	LOG_INF("IPv4 address %s", host);
+	return 0;
+}
+
 int main(void)
 {
 	int ret;
 
-	// if (dk_leds_init() != 0) {
-	// 	LOG_ERR("Failed to initialize the LED library");
-	// }
+	#ifdef CLOCK_FEATURE_HFCLK_DIVIDE_PRESENT
+	nrfx_clock_divider_set(NRF_CLOCK_DOMAIN_HFCLK, NRF_CLOCK_HFCLK_DIV_1);
+	#endif
 
+	LOG_INF("Starting %s with CPU frequency: %d MHz", CONFIG_BOARD, SystemCoreClock/MHZ(1));
+	k_sleep(K_SECONDS(1));
+	
 	if (wifi_connect() != 0) {
 		LOG_ERR("Failed to connect to Wi-Fi");
 	}
 
-	// if (dk_buttons_init(button_handler) != 0) {
-	// 	LOG_ERR("Failed to initialize the buttons library");
-	// }
-
-    // #ifdef CLOCK_FEATURE_HFCLK_DIVIDE_PRESENT
-	// nrfx_clock_divider_set(NRF_CLOCK_DOMAIN_HFCLK, NRF_CLOCK_HFCLK_DIV_1);
-    // #endif
-
 	struct zperf_upload_params params;
 
-		/* Start Wi-Fi traffic */
+	/* Start Wi-Fi traffic */
 	LOG_INF("Starting Wi-Fi benchmark: Zperf client");
 	params.duration_ms = WIFI_TEST_DURATION;
 	params.rate_kbps = WIFI_ZPERF_RATE;
 	params.packet_size = WIFI_ZPERF_PKT_SIZE;
-    // ret = net_addr_pton(AF_INET, PEER_IPV4_ADDR, &in4_addr_my);
-	// parse_ipv4_addr(PEER_IPV4_ADDR,
-	// 	&in4_addr_my);
-	// net_sprint_ipv4_addr(&in4_addr_my.sin_addr);
-    ret = net_addr_pton(AF_INET, PEER_IPV4_ADDR, &params.peer_addr);
-	// memcpy(&params.peer_addr, &in4_addr_my, sizeof(in4_addr_my));
 
-    /* Printing server address, for debugging only */
-    char ipv4_addr[NET_IPV4_ADDR_LEN];
-	inet_ntop(AF_INET, &params.peer_addr, ipv4_addr,
-		  sizeof(ipv4_addr));
-	LOG_INF("IPv4 address of server: %s", ipv4_addr);
+	parse_ipv4_addr(CONFIG_NET_CONFIG_PEER_IPV4_ADDR,
+			&in4_addr_my);
+
+	memcpy(&params.peer_addr, &in4_addr_my, sizeof(in4_addr_my));
 
 	ret = zperf_udp_upload_async(&params, udp_upload_results_cb, NULL);
 	if (ret != 0) {
@@ -221,9 +227,6 @@ int main(void)
 	} else {
 		LOG_INF("UDP SESSION FINISHED");
 	}
-
-	while (1) {
-	 	}
 
 	return 0;
 }
