@@ -15,7 +15,7 @@
 #include <net/wifi_mgmt_ext.h>
 #include <zephyr/net/socket.h>
 
-/* STEP x.x - Include the header files for the zperf API and nrfx clock */ 
+/* STEP 2 - Include the header files for the zperf API and nrfx clock */ 
 #include <zephyr/net/zperf.h>
 #include <nrfx_clock.h>
 
@@ -30,15 +30,15 @@ K_SEM_DEFINE(ipv4_obtained_sem, 0, 1);
 #define IPV4_MGMT_EVENTS (NET_EVENT_IPV4_ADDR_ADD | \
 				NET_EVENT_IPV4_ADDR_DEL)
 
-/* STEP x.x - Define port for the zperf server */
+/* STEP 3.1 - Define port for the zperf server */
 #define PEER_PORT 5001
 
-/* STEP x.x - Define packet size, rate and test duration */
+/* STEP 3.2 - Define packet size, rate and test duration */
 #define WIFI_ZPERF_PKT_SIZE 1024
 #define WIFI_ZPERF_RATE 10000
 #define WIFI_TEST_DURATION 20000
 
-/* STEP x.x - Create a socket address struct for the server address */
+/* STEP 4 - Create a socket address struct for the server address */
 static struct sockaddr_in in4_addr_my = {
 	.sin_family = AF_INET,
 	.sin_port = htons(PEER_PORT),
@@ -137,14 +137,13 @@ static void udp_upload_results_cb(enum zperf_status status,
 	/* Handle the three zperf session statuses: started, finished, and error */
 	switch (status) {
 	case ZPERF_SESSION_STARTED:
-		/* STEP x.x - Inform the user that the UDP session has started */
+		/* STEP 7.1 - Inform the user that the UDP session has started */
 		LOG_INF("New UDP session started");
 		break;
 	case ZPERF_SESSION_FINISHED:
-		LOG_INF("Wi-Fi benchmark: Upload completed!");
-		/* STEP x.x - If client_time_in_us is not zero, calculate the throughput rate in kilobit per second. Otherwise, set it to zero */
+		LOG_INF("Wi-Fi throughput test: Upload completed!");
+		/* STEP 7.2 - If client_time_in_us is not zero, calculate the throughput rate in kilobit per second. Otherwise, set it to zero */
 		if (result->client_time_in_us != 0U) {
-			
 			client_rate_in_kbps = (uint32_t)
 				(((uint64_t)result->nb_packets_sent *
 				  (uint64_t)result->packet_size * (uint64_t)8 *
@@ -153,7 +152,7 @@ static void udp_upload_results_cb(enum zperf_status status,
 		} else {
 			client_rate_in_kbps = 0U;
 		}
-		/* STEP x.x - Print the results of the throughput test */
+		/* STEP 7.3 - Print the results of the throughput test */
 		LOG_INF("Upload results:");
 		LOG_INF("%u bytes in %u ms",
 				(result->nb_packets_sent * result->packet_size),
@@ -164,7 +163,7 @@ static void udp_upload_results_cb(enum zperf_status status,
 		LOG_INF("%u kbps throughput",client_rate_in_kbps);
 		break;
 	case ZPERF_SESSION_ERROR:
-		/* STEP x.x - Inform the user that there is an error with the UDP session */
+		/* STEP 7.4 - Inform the user that there is an error with the UDP session */
 		LOG_ERR("UDP session error");
 		break;
 	}
@@ -186,13 +185,15 @@ int main(void)
 		LOG_ERR("Failed to connect to Wi-Fi");
 	}
 
-	/* STEP x.x - Configure the parameters for the zperf client */
+	/* STEP 5.1 - Initialize a struct for storing the zperf upload parameters */
 	struct zperf_upload_params params;
-	params.duration_ms = WIFI_TEST_DURATION;
-	params.rate_kbps = WIFI_ZPERF_RATE;
-	params.packet_size = WIFI_ZPERF_PKT_SIZE;
 
-	/* STEP x.x - Convert the server address from a string to IP address */
+	/* STEP 5.2 - Configure packet size, rate and duration from the defines created earlier */
+	params.packet_size = WIFI_ZPERF_PKT_SIZE;
+	params.rate_kbps = WIFI_ZPERF_RATE;
+	params.duration_ms = WIFI_TEST_DURATION;	
+
+	/* STEP 5.3 - Convert the server address from a string to IP address */
 	ret = net_addr_pton(AF_INET, CONFIG_NET_CONFIG_PEER_IPV4_ADDR, &in4_addr_my.sin_addr);
 	if (ret < 0) {
 		LOG_ERR("Invalid IPv4 address %s\n", CONFIG_NET_CONFIG_PEER_IPV4_ADDR);
@@ -200,15 +201,15 @@ int main(void)
 	}
 	LOG_INF("IPv4 address %s", CONFIG_NET_CONFIG_PEER_IPV4_ADDR);
 
-	/* STEP x.x - Configure the zperf server address */
+	/* STEP 5.4 - Add the zperf server address to the zperf_upload_params struct */
 	memcpy(&params.peer_addr, &in4_addr_my, sizeof(in4_addr_my));
 
-	LOG_INF("Starting Wi-Fi benchmark: Zperf client");
+	LOG_INF("Starting Wi-Fi throughput test: Zperf client");
 
-	/* STEP x.x - Call zperf_udp_upload_async() to start the asynchronous UDP upload */
+	/* STEP 6 - Call zperf_udp_upload_async() to start the asynchronous UDP upload */
 	ret = zperf_udp_upload_async(&params, udp_upload_results_cb, NULL);
 	if (ret != 0) {
-		LOG_ERR("Failed to start Wi-Fi benchmark: %d\n", ret);
+		LOG_ERR("Failed to start Wi-Fi throughput test: %d\n", ret);
 		return ret;
 	}
 
