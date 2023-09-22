@@ -38,6 +38,11 @@ K_SEM_DEFINE(ipv4_obtained_sem, 0, 1);
 static struct net_mgmt_event_callback wifi_mgmt_cb;
 static struct net_mgmt_event_callback ipv4_mgmt_cb;
 
+#define DTIM_LONG_PRESS_TIMEOUT K_SECONDS(1)
+#define LISTEN_INTERVAL_LONG_PRESS_TIMEOUT K_SECONDS(1)
+struct k_timer dtim_long_press_timer;
+struct k_timer listen_interval_long_press_timer;
+
 static int wifi_args_to_params(struct wifi_connect_req_params *params)
 {
 	params->ssid = CONFIG_WIFI_CREDENTIALS_STATIC_SSID;
@@ -60,7 +65,7 @@ static void wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb,
 		LOG_INF("Connected to Wi-Fi Network: %s", CONFIG_WIFI_CREDENTIALS_STATIC_SSID);
         dk_set_led_on(DK_LED1);
 		k_sem_give(&wifi_connected_sem);
-		nrf_wifi_ps_enabled = 0;
+		nrf_wifi_ps_enabled = 1;
 		break;
 	case NET_EVENT_WIFI_DISCONNECT_RESULT:
 		LOG_INF("Disconnected from Wi-Fi Network");
@@ -120,21 +125,17 @@ static int wifi_connect() {
 	return 0;
 }
 
-int wifi_set_power_state(int wakeup_mode)
+int wifi_set_power_state(int enable)
 {
 	struct net_if *iface = net_if_get_default();
 	struct wifi_ps_params params = { 0 };
 
-	if (nrf_wifi_ps_enabled) {
-		params.enabled = WIFI_PS_DISABLED;
+	if (enable) {
+		params.enabled = WIFI_PS_ENABLED;
 	}
 	else {
-		params.enabled = WIFI_PS_ENABLED;
-		params.wakeup_mode = wakeup_mode;
-		// params.listen_interval = ;
-		LOG_INF("Wakeup mode: %s", params.wakeup_mode ? "Extended (listen interval)" : "DTIM (legacy)");
+		params.enabled = WIFI_PS_DISABLED;
 	}
-
 
 	if (net_mgmt(NET_REQUEST_WIFI_PS, iface, &params, sizeof(params))) {
 		LOG_ERR("Power save %s failed. Reason %s", params.enabled ? "enable" : "disable", get_ps_config_err_code_str(params.fail_reason));
@@ -146,20 +147,60 @@ int wifi_set_power_state(int wakeup_mode)
 	return 0;
 }
 
-//enum wifi_config_ps_param_fail_reason fail_reason;
+int wifi_set_ps_wakeup_mode(int wakeup_mode){
+	struct net_if *iface = net_if_get_default();
+	struct wifi_ps_params params = { 0 };
+	params.wakeup_mode = wakeup_mode;
+	params.type = WIFI_PS_PARAM_WAKEUP_MODE;
+	if (net_mgmt(NET_REQUEST_WIFI_PS, iface, &params, sizeof(params))) {
+		LOG_ERR("Setting wakeup mode %s failed. Reason %s", params.wakeup_mode ? "DTIM" : "listen interval", get_ps_config_err_code_str(params.fail_reason));
+	}
+	LOG_INF("Wakeup mode: %s", params.wakeup_mode ? "Extended (listen interval)" : "DTIM (legacy)");
+}
 
 
 static void button_handler(uint32_t button_state, uint32_t has_changed)
 {
-	uint32_t buttons = button_state & has_changed;
-
-	if (buttons & DK_BTN1_MSK) {
-		// DTIM/Legacy pc mode
-		wifi_set_power_state(WIFI_PS_WAKEUP_MODE_DTIM);
+	if (DK_BTN1_MSK & has_changed) {
+		if (DK_BTN1_MSK & button_state) {
+			/* Button changed its state to pressed */
+			k_timer_start(&dtim_long_press_timer, DTIM_LONG_PRESS_TIMEOUT, K_NO_WAIT);
+		} else {
+			/* Button changed its state to released */
+			if (k_timer_status_get(&dtim_long_press_timer) > 0) {
+				/* Timer expired before button was released, indicates long press */
+				LOG_INF("Long button press");
+				wifi_set_power_state(0);
+			} else {
+				LOG_INF("Short button press");
+				k_timer_stop(&dtim_long_press_timer);
+				wifi_set_ps_wakeup_mode(WIFI_PS_WAKEUP_MODE_DTIM);
+				if (!nrf_wifi_ps_enabled) {
+					wifi_set_power_state(1);
+				}
+			}
+		}
 	}
-	if (buttons & DK_BTN2_MSK) {
-		// Listen/Extended ps mode
-		wifi_set_power_state(WIFI_PS_WAKEUP_MODE_LISTEN_INTERVAL);
+
+	if (DK_BTN2_MSK & has_changed) {
+		if (DK_BTN2_MSK & button_state) {
+			/* Button changed its state to pressed */
+			k_timer_start(&listen_interval_long_press_timer, LISTEN_INTERVAL_LONG_PRESS_TIMEOUT, K_NO_WAIT);
+		} else {
+			/* Button changed its state to released */
+			if (k_timer_status_get(&listen_interval_long_press_timer) > 0) {
+				/* Timer expired before button was released, indicates long press */
+				LOG_INF("Long button press");
+				wifi_set_power_state(0);
+			} else {
+				LOG_INF("Short button press");
+				k_timer_stop(&listen_interval_long_press_timer);
+				wifi_set_ps_wakeup_mode(WIFI_PS_WAKEUP_MODE_LISTEN_INTERVAL);
+				if (!nrf_wifi_ps_enabled) {
+					wifi_set_power_state(1);
+				}
+			}
+		}
 	}
 }
 
@@ -180,28 +221,30 @@ int main(void)
 	if (wifi_connect() != 0) {
 		LOG_ERR("Failed to connect to Wi-Fi");
 	}
+	// wifi_set_power_state(0,0);
 
 	#ifdef CONFIG_NET_SHELL
 	shell_backend = shell_backend_uart_get_ptr();
 	#endif
+	k_timer_init(&listen_interval_long_press_timer, NULL, NULL);
+	k_timer_init(&dtim_long_press_timer, NULL, NULL);
 
 	while (1) {
 		dk_set_led(DK_LED2, 1);
-		k_sleep(K_SECONDS(10));
+		k_sleep(K_SECONDS(20));
 		/* Scheduling the shell ping to main thread
 		 * ie, a lower prio than workq
 		 */
-		// if (ping_cmd_recv) {
-			#ifdef CONFIG_NET_SHELL		
-			char ping_cmd[64] = "net ping 8.8.8.8";
-			ret = shell_execute_cmd(shell_backend, ping_cmd);
-			if (ret) {
-				LOG_INF("shell error: %d\n", ret);
-			}
-			// ping_cmd_recv = false;
-			dk_set_led(DK_LED2, 0);
-			#endif			
+
+		#ifdef CONFIG_NET_SHELL		
+		char ping_cmd[64] = "net ping 8.8.8.8";
+		ret = shell_execute_cmd(shell_backend, ping_cmd);
+		if (ret) {
+			LOG_INF("shell error: %d\n", ret);
 		}
+		dk_set_led(DK_LED2, 0);
+		#endif			
+	}
 
 	return 0;
 }
