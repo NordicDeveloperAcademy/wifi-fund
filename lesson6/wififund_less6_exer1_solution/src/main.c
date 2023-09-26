@@ -10,21 +10,18 @@
 #include <dk_buttons_and_leds.h>
 
 #include <zephyr/net/net_if.h>
-#include <zephyr/net/wifi_mgmt.h>
+
 #include <zephyr/net/net_event.h>
+#include <zephyr/net/wifi_mgmt.h>
 #include <net/wifi_mgmt_ext.h>
+
+#include <zephyr/net/net_ip.h>
 #include <zephyr/net/socket.h>
 
-#ifdef CONFIG_NET_SHELL
-#include <zephyr/shell/shell.h>
-#include <zephyr/shell/shell_uart.h>
+#include <zephyr/net/http/client.h>
 
-const struct shell *shell_backend;
-#endif
 
 LOG_MODULE_REGISTER(Lesson6_Exercise1, LOG_LEVEL_INF);
-
-bool nrf_wifi_ps_enabled = 0;
 
 K_SEM_DEFINE(wifi_connected_sem, 0, 1);
 K_SEM_DEFINE(ipv4_obtained_sem, 0, 1);
@@ -35,13 +32,25 @@ K_SEM_DEFINE(ipv4_obtained_sem, 0, 1);
 #define IPV4_MGMT_EVENTS (NET_EVENT_IPV4_ADDR_ADD | \
 				NET_EVENT_IPV4_ADDR_DEL)
 
+#define HTTP_HOSTNAME "d1jglomgqgmujc.cloudfront.net"
+#define HTTP_PORT 80
+
+#define RECV_BUF_SIZE 2048
+#define CLIENT_ID_SIZE 36
+
+static char recv_buf[RECV_BUF_SIZE];
+static char client_id_buf[CLIENT_ID_SIZE+2];
+
+static int counter = 0;
+
+static int sock;
+static struct sockaddr_storage server;
+
+bool nrf_wifi_ps_enabled = 1;
+bool http_put = 1;
+
 static struct net_mgmt_event_callback wifi_mgmt_cb;
 static struct net_mgmt_event_callback ipv4_mgmt_cb;
-
-#define DTIM_LONG_PRESS_TIMEOUT K_SECONDS(1)
-#define LISTEN_INTERVAL_LONG_PRESS_TIMEOUT K_SECONDS(1)
-struct k_timer dtim_long_press_timer;
-struct k_timer listen_interval_long_press_timer;
 
 static int wifi_args_to_params(struct wifi_connect_req_params *params)
 {
@@ -65,7 +74,7 @@ static void wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb,
 		LOG_INF("Connected to Wi-Fi Network: %s", CONFIG_WIFI_CREDENTIALS_STATIC_SSID);
         dk_set_led_on(DK_LED1);
 		k_sem_give(&wifi_connected_sem);
-		nrf_wifi_ps_enabled = 1;
+		nrf_wifi_ps_enabled = 0;
 		break;
 	case NET_EVENT_WIFI_DISCONNECT_RESULT:
 		LOG_INF("Disconnected from Wi-Fi Network");
@@ -125,12 +134,175 @@ static int wifi_connect() {
 	return 0;
 }
 
-int wifi_set_power_state(int enable)
+static int server_resolve(void)
+{
+	int err;
+	struct addrinfo *result;
+	struct addrinfo hints = {
+		.ai_family = AF_INET,
+		.ai_socktype = SOCK_STREAM
+	};
+
+	err = getaddrinfo(HTTP_HOSTNAME, STRINGIFY(HTTP_PORT), &hints, &result);
+	if (err != 0) {
+		LOG_INF("getaddrinfo failed, err: %d, %s", err, gai_strerror(err));
+		return -EIO;
+	}
+
+	if (result == NULL) {
+		LOG_INF("Error, address not found");
+		return -ENOENT;
+	}
+	
+	struct sockaddr_in *server4 = ((struct sockaddr_in *)&server);
+	server4->sin_addr.s_addr = 
+		((struct sockaddr_in *)result->ai_addr)->sin_addr.s_addr;
+	server4->sin_family = AF_INET;
+	server4->sin_port = ((struct sockaddr_in *)result->ai_addr)->sin_port;
+
+	char ipv4_addr[NET_IPV4_ADDR_LEN];
+	inet_ntop(AF_INET, &server4->sin_addr.s_addr, ipv4_addr,
+		sizeof(ipv4_addr));
+	LOG_INF("IPv4 Address found %s", ipv4_addr);
+
+	freeaddrinfo(result);
+
+	return 0;
+}
+
+static int server_connect(void)
+{
+	int err;
+	sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (sock < 0) {
+		LOG_INF("Failed to create socket, err: %d, %s", errno, strerror(errno));
+		return -errno;
+	}
+
+	err = connect(sock, (struct sockaddr *)&server,
+		      sizeof(struct sockaddr_in));
+	if (err < 0) {
+		LOG_INF("Connecting to server failed, err: %d, %s", errno, strerror(errno));
+		return -errno;
+
+	}
+	LOG_INF("Successfully connected to HTTP server");
+
+	return 0;
+}
+
+static void response_cb(struct http_response *rsp,
+                        enum http_final_call final_data,
+                        void *user_data)
+{	
+	LOG_INF("Response status: %s", rsp->http_status);
+
+	if (rsp->body_frag_len > 0) {
+		char body_buf[rsp->body_frag_len];
+		strncpy(body_buf, rsp->body_frag_start, rsp->body_frag_len);
+		LOG_INF("Received: %s", body_buf);
+	} 
+}
+
+static void client_id_cb(struct http_response *rsp,
+                        enum http_final_call final_data,
+                        void *user_data)
+{
+	LOG_INF("Response status: %s", rsp->http_status);
+	
+	char client_id_buf_tmp[CLIENT_ID_SIZE+1];
+	strncpy(client_id_buf_tmp, rsp->body_frag_start, CLIENT_ID_SIZE);
+	client_id_buf_tmp[CLIENT_ID_SIZE]='\0';
+	client_id_buf[0]='/';
+	strcat(client_id_buf,client_id_buf_tmp);
+
+	LOG_INF("Succesfully aquired client ID: %s", client_id_buf);
+}
+
+
+static int client_http_put(void)
+{
+	int err = 0;
+	int bytes_written;
+
+	struct http_request req;
+	memset(&req, 0, sizeof(req));
+
+	char buffer[12] = {0};
+	bytes_written = snprintf(buffer, 12, "%d", counter);
+	if (bytes_written < 0){
+		LOG_INF("Unable to write to buffer, err: %d", bytes_written);
+		return bytes_written;
+	}
+
+	req.method = HTTP_PUT;
+	req.url = client_id_buf;
+	req.host = HTTP_HOSTNAME;
+	req.protocol = "HTTP/1.1";
+	req.payload = buffer;
+	req.payload_len = bytes_written;
+	req.response = response_cb;
+	req.recv_buf = recv_buf;
+	req.recv_buf_len = sizeof(recv_buf);
+
+	LOG_INF("HTTP PUT request: %s", buffer);
+	err = http_client_req(sock, &req, 5000, NULL);
+	if (err < 0) {
+		LOG_INF("Failed to send HTTP PUT request %s, err: %d", buffer, err);
+	}
+	
+	return err;
+}
+
+static int client_http_get(void)
+{
+	int err = 0;
+	struct http_request req;
+
+	memset(&req, 0, sizeof(req));
+
+	req.method = HTTP_GET;
+	req.url = client_id_buf;
+	req.host = HTTP_HOSTNAME;
+	req.protocol = "HTTP/1.1";
+	req.response = response_cb;
+	req.recv_buf = recv_buf;
+	req.recv_buf_len = sizeof(recv_buf);
+
+	LOG_INF("HTTP GET request");
+	err = http_client_req(sock, &req, 5000, NULL);
+	if (err < 0) {
+		LOG_INF("Failed to send HTTP GET request, err: %d", err);
+	}
+	
+	return err;
+}
+
+static int client_get_new_id(void){
+	int err = 0;
+
+	struct http_request req;
+	memset(&req, 0, sizeof(req));
+
+	req.method = HTTP_POST;
+	req.url = "/new";
+	req.host = HTTP_HOSTNAME;
+	req.protocol = "HTTP/1.1";
+	req.response = client_id_cb;
+	req.recv_buf = recv_buf;
+	req.recv_buf_len = sizeof(recv_buf);
+
+	err = http_client_req(sock, &req, 5000, NULL);
+
+	return err;
+}
+
+int wifi_set_power_state()
 {
 	struct net_if *iface = net_if_get_default();
 	struct wifi_ps_params params = { 0 };
 
-	if (enable) {
+	if (nrf_wifi_ps_enabled) {
 		params.enabled = WIFI_PS_ENABLED;
 	}
 	else {
@@ -147,64 +319,42 @@ int wifi_set_power_state(int enable)
 	return 0;
 }
 
-int wifi_set_ps_wakeup_mode(int wakeup_mode){
+int wifi_set_ps_wakeup_mode(){
 	struct net_if *iface = net_if_get_default();
 	struct wifi_ps_params params = { 0 };
-	params.wakeup_mode = wakeup_mode;
+
 	params.type = WIFI_PS_PARAM_WAKEUP_MODE;
+	params.wakeup_mode = WIFI_PS_WAKEUP_MODE_DTIM;
+	/* Extended/listen interval wakeup mode */
+	//params.wakeup_mode = WIFI_PS_WAKEUP_MODE_LISTEN_INTERVAL;
+	
 	if (net_mgmt(NET_REQUEST_WIFI_PS, iface, &params, sizeof(params))) {
-		LOG_ERR("Setting wakeup mode %s failed. Reason %s", params.wakeup_mode ? "DTIM" : "listen interval", get_ps_config_err_code_str(params.fail_reason));
+		LOG_ERR("Setting wakeup mode failed. Reason %s", get_ps_config_err_code_str(params.fail_reason));
+		return -1;
 	}
-	LOG_INF("Wakeup mode: %s", params.wakeup_mode ? "Extended (listen interval)" : "DTIM (legacy)");
+	LOG_INF("Wakeup mode set");
 }
 
 
 static void button_handler(uint32_t button_state, uint32_t has_changed)
 {
-	if (DK_BTN1_MSK & has_changed) {
-		if (DK_BTN1_MSK & button_state) {
-			/* Button changed its state to pressed */
-			k_timer_start(&dtim_long_press_timer, DTIM_LONG_PRESS_TIMEOUT, K_NO_WAIT);
-		} else {
-			/* Button changed its state to released */
-			if (k_timer_status_get(&dtim_long_press_timer) > 0) {
-				/* Timer expired before button was released, indicates long press */
-				LOG_INF("Long button press");
-				wifi_set_power_state(0);
-			} else {
-				LOG_INF("Short button press");
-				k_timer_stop(&dtim_long_press_timer);
-				wifi_set_ps_wakeup_mode(WIFI_PS_WAKEUP_MODE_DTIM);
-				if (!nrf_wifi_ps_enabled) {
-					wifi_set_power_state(1);
-				}
-			}
-		}
+	uint32_t button = button_state & has_changed;
+
+	if (button & DK_BTN1_MSK) {
+		wifi_set_power_state();
 	}
 
-	if (DK_BTN2_MSK & has_changed) {
-		if (DK_BTN2_MSK & button_state) {
-			/* Button changed its state to pressed */
-			k_timer_start(&listen_interval_long_press_timer, LISTEN_INTERVAL_LONG_PRESS_TIMEOUT, K_NO_WAIT);
-		} else {
-			/* Button changed its state to released */
-			if (k_timer_status_get(&listen_interval_long_press_timer) > 0) {
-				/* Timer expired before button was released, indicates long press */
-				LOG_INF("Long button press");
-				wifi_set_power_state(0);
-			} else {
-				LOG_INF("Short button press");
-				k_timer_stop(&listen_interval_long_press_timer);
-				wifi_set_ps_wakeup_mode(WIFI_PS_WAKEUP_MODE_LISTEN_INTERVAL);
-				if (!nrf_wifi_ps_enabled) {
-					wifi_set_power_state(1);
-				}
-			}
+	if (button & DK_BTN2_MSK) {
+		if (http_put) {
+			client_http_put();
+			counter++;
 		}
+		else {
+			client_http_get();
+		}
+		http_put = http_put ? 0 : 1;
 	}
 }
-
-const struct shell *shell_backend;
 
 int main(void)
 {
@@ -217,34 +367,33 @@ int main(void)
 	if (dk_buttons_init(button_handler) != 0) {
 		LOG_ERR("Failed to initialize the buttons library");
 	}
-	
+
 	if (wifi_connect() != 0) {
 		LOG_ERR("Failed to connect to Wi-Fi");
 	}
-	// wifi_set_power_state(0,0);
 
-	#ifdef CONFIG_NET_SHELL
-	shell_backend = shell_backend_uart_get_ptr();
-	#endif
-	k_timer_init(&listen_interval_long_press_timer, NULL, NULL);
-	k_timer_init(&dtim_long_press_timer, NULL, NULL);
+	wifi_set_ps_wakeup_mode();
+	wifi_set_power_state();
 
-	while (1) {
-		dk_set_led(DK_LED2, 1);
-		k_sleep(K_SECONDS(20));
-		/* Scheduling the shell ping to main thread
-		 * ie, a lower prio than workq
-		 */
-
-		#ifdef CONFIG_NET_SHELL		
-		char ping_cmd[64] = "net ping 8.8.8.8";
-		ret = shell_execute_cmd(shell_backend, ping_cmd);
-		if (ret) {
-			LOG_INF("shell error: %d\n", ret);
-		}
-		dk_set_led(DK_LED2, 0);
-		#endif			
+	if (server_resolve() != 0) {
+		LOG_INF("Failed to resolve server name");
+		return 0;
 	}
 
+	if (server_connect() != 0) {
+		LOG_INF("Failed to initialize client");
+		return 0;
+	}
+
+	if (client_get_new_id() < 0) {
+		LOG_INF("Failed to get client ID");
+		return 0;
+	}
+
+	while (1) {
+		k_sleep(K_FOREVER);
+	}
+
+	close(sock);
 	return 0;
 }
