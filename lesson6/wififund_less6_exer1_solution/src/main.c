@@ -46,6 +46,7 @@ static int counter = 0;
 static int sock;
 static struct sockaddr_storage server;
 
+/* STEP 2 -  */
 bool nrf_wifi_ps_enabled = 1;
 bool http_put = 1;
 
@@ -300,8 +301,10 @@ static int client_get_new_id(void){
 int wifi_set_power_state()
 {
 	struct net_if *iface = net_if_get_default();
+	/* STEP 3.1 - Define the Wi-Fi power save parameters struct wifi_ps_params */
 	struct wifi_ps_params params = { 0 };
 
+	/* STEP 3.2 -  */
 	if (nrf_wifi_ps_enabled) {
 		params.enabled = WIFI_PS_ENABLED;
 	}
@@ -309,25 +312,32 @@ int wifi_set_power_state()
 		params.enabled = WIFI_PS_DISABLED;
 	}
 
+	/* STEP x.x -  */
 	if (net_mgmt(NET_REQUEST_WIFI_PS, iface, &params, sizeof(params))) {
 		LOG_ERR("Power save %s failed. Reason %s", params.enabled ? "enable" : "disable", get_ps_config_err_code_str(params.fail_reason));
 		return -1;
 	}
 	LOG_INF("Set power save: %s", params.enabled ? "enable" : "disable");
 	
+	/* STEP x.x -  */
 	nrf_wifi_ps_enabled = nrf_wifi_ps_enabled ? 0 : 1;
 	return 0;
 }
 
 int wifi_set_ps_wakeup_mode(){
+	/* STEP x.x -  */
 	struct net_if *iface = net_if_get_default();
 	struct wifi_ps_params params = { 0 };
 
+	/* STEP x.x -  */
+	/* Legacy/DTIM wakeup mode */
 	params.type = WIFI_PS_PARAM_WAKEUP_MODE;
 	params.wakeup_mode = WIFI_PS_WAKEUP_MODE_DTIM;
+	/* STEP x.x -  */
 	/* Extended/listen interval wakeup mode */
 	//params.wakeup_mode = WIFI_PS_WAKEUP_MODE_LISTEN_INTERVAL;
 	
+	/* STEP x.x -  */
 	if (net_mgmt(NET_REQUEST_WIFI_PS, iface, &params, sizeof(params))) {
 		LOG_ERR("Setting wakeup mode failed. Reason %s", get_ps_config_err_code_str(params.fail_reason));
 		return -1;
@@ -338,13 +348,17 @@ int wifi_set_ps_wakeup_mode(){
 
 static void button_handler(uint32_t button_state, uint32_t has_changed)
 {
+	/* STEP x.x -  */
 	uint32_t button = button_state & has_changed;
-
+	
+	/* STEP x.x -  */
 	if (button & DK_BTN1_MSK) {
+		/* STEP x.x -  */
 		wifi_set_power_state();
 	}
 
 	if (button & DK_BTN2_MSK) {
+		/* STEP x.x -  */
 		if (http_put) {
 			client_http_put();
 			counter++;
@@ -372,6 +386,7 @@ int main(void)
 		LOG_ERR("Failed to connect to Wi-Fi");
 	}
 
+	/* STEP x.x -  */
 	wifi_set_ps_wakeup_mode();
 	wifi_set_power_state();
 
