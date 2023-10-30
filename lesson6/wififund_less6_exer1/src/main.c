@@ -47,11 +47,10 @@ static int sock;
 static struct sockaddr_storage server;
 
 /* STEP 2 - Create two variables to keep track of the power save status and PUT/GET request. */
-bool nrf_wifi_ps_enabled = 1;
-bool http_put = 1;
+
 
 /* STEP 6.1 - Create a variables to keep track of the power save wakeup mode. */
-bool nrf_wifi_ps_wakeup_mode = 0;
+
 
 static struct net_mgmt_event_callback wifi_mgmt_cb;
 static struct net_mgmt_event_callback ipv4_mgmt_cb;
@@ -305,27 +304,21 @@ int wifi_set_power_state()
 	struct net_if *iface = net_if_get_default();
 
 	/* STEP 3.1 - Define the Wi-Fi power save parameters struct wifi_ps_params. */
-	struct wifi_ps_params params = { 0 };
+	
 
 	/* STEP 3.2 - Create an if statement to check if power saving is currently enabled.
 	 * If it is not currently enabled, set the wifi_ps_params enabled parameter to WIFI_PS_ENABLED to enable power saving.
 	 * If it is enabled, set enabled to WIFI_PS_DISABLED to disable power saving. */
-	if (!nrf_wifi_ps_enabled) {
-		params.enabled = WIFI_PS_ENABLED;
-	}
-	else {
-		params.enabled = WIFI_PS_DISABLED;
-	}
+	
 
 	/* STEP 3.3 - Send the power save request with net_mgmt. */
-	if (net_mgmt(NET_REQUEST_WIFI_PS, iface, &params, sizeof(params))) {
-		LOG_ERR("Power save %s failed. Reason %s", params.enabled ? "enable" : "disable", wifi_ps_get_config_err_code_str(params.fail_reason));
-		return -1;
-	}
+	
+	
 	LOG_INF("Set power save: %s", params.enabled ? "enable" : "disable");
 	
 	/* STEP 3.4 - Toggle the value of nrf_wifi_ps_enabled to indicate the new power save status. */
-	nrf_wifi_ps_enabled = nrf_wifi_ps_enabled ? 0 : 1;
+	
+	
 	return 0;
 }
 
@@ -334,26 +327,18 @@ int wifi_set_ps_wakeup_mode()
 	struct net_if *iface = net_if_get_default();
 
 	/* STEP 6.2 - Define a new wifi_ps_params struct for the wakeup mode request. */
-	struct wifi_ps_params params = { 0 };
+	
 
 	/* STEP 6.3 - Create an if statement to check the wakeup mode.
 	 * If nrf_wifi_ps_wakeup_mode is true, the wakeup mode is listen interval and we want to change it to DTIM.
 	 * If nrf_wifi_ps_wakeup_mode is false, the wakeup mode is DTIM and we want to change it to listen interval. */
-	if (nrf_wifi_ps_wakeup_mode) {
-		params.wakeup_mode = WIFI_PS_WAKEUP_MODE_DTIM;
-	}
-	else {
-		params.wakeup_mode = WIFI_PS_WAKEUP_MODE_LISTEN_INTERVAL;
-	}
+	
 
 	/* STEP 6.4 - Set the request type to wakeup mode. */
-	params.type = WIFI_PS_PARAM_WAKEUP_MODE;
+	
 
 	/* STEP 6.5 - Send the wakeup mode request with net_mgmt like we did in step 3. */
-	if (net_mgmt(NET_REQUEST_WIFI_PS, iface, &params, sizeof(params))) {
-		LOG_ERR("Setting wakeup mode failed. Reason %s", wifi_ps_get_config_err_code_str(params.fail_reason));
-		return -1;
-	}
+	
 	LOG_INF("Set wakeup mode: %s", params.wakeup_mode ? "listen interval" : "DTIM");
 
 	nrf_wifi_ps_wakeup_mode = nrf_wifi_ps_wakeup_mode ? 0 : 1;
@@ -366,23 +351,17 @@ static void button_handler(uint32_t button_state, uint32_t has_changed)
 	
 	/* STEP 4.1 - Call wifi_set_power_state() when button 1 is pressed. */
 	if (button & DK_BTN1_MSK) {
-		wifi_set_power_state();
+		
 		/* STEP 6.6 - Modify button_handler to call wifi_set_ps_wakeup_mode() instead of wifi_set_power_state() when button 1 is pressed. */
-		// wifi_set_ps_wakeup_mode();
+		
 	}
 
 	/* STEP 4.2 - When button 2 is pressed, if http_put is true, call client_http_put() and increase the counter variable with 1. 
 	 * If http_put is false, call client_http_get() instead. */
 	if (button & DK_BTN2_MSK) {
-		if (http_put) {
-			client_http_put();
-			counter++;
-		}
-		else {
-			client_http_get();
-		}
+		
 		/* STEP 4.3 - Toggle the value of http_put. */
-		http_put = http_put ? 0 : 1;
+		
 	}
 }
 
