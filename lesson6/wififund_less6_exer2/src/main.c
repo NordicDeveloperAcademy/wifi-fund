@@ -37,6 +37,7 @@ K_SEM_DEFINE(ipv4_obtained_sem, 0, 1);
 #define RECV_BUF_SIZE 256
 
 static int counter = 0;
+static int recv_counter = 0;
 
 static int sock;
 static struct sockaddr_in server;
@@ -49,7 +50,7 @@ int receive_packet();
 /* STEP 1.2 - Define macros for wakeup time and interval for TWT.  */
 
 
-/* STEP 1.3 - Create two variables to keep track of TWT status and flow ID. */
+/* STEP 1.3 - Create variables to keep track of TWT status, flow ID, and if sending packets is enabled. */
 
 
 static struct net_mgmt_event_callback wifi_mgmt_cb;
@@ -71,10 +72,10 @@ static int wifi_args_to_params(struct wifi_connect_req_params *params)
 
 static void handle_wifi_twt_event(struct net_mgmt_event_callback *cb)
 {
-	/* STEP 4.1 - Create a wifi_twt_params struct for the TWT response and fill it with the response information. */
+	/* STEP 4.1 - Create a wifi_twt_params struct for the received TWT event and fill it with the event information. */
 	
 	
-	/* STEP 4.2 - If the TWT request was for TWT teardown, change the value of nrf_wifi_twt_enabled and exit the function. */
+	/* STEP 4.2 - If the event was a TWT teardown iniatiated by the AP, set change the value of nrf_wifi_twt_enabled and exit the function. */
 	
 
 	/* STEP 4.3 - Update twt_flow_id to reflect the flow ID received in the TWT response. */
@@ -106,7 +107,7 @@ static void wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb,
 		break;
 	case NET_EVENT_WIFI_TWT_SLEEP_STATE:
 		/* STEP 3.2.2 -	Upon TWT sleep state event, inform the user of the current sleep state.
-		/* When the device is in the awake state, send a packet to the server and check for any received packets. */
+		 * When the device is in the awake state, send a packet to the server and check for any received packets if sending packets is enabled. */
 		
 		break;
 	default:
@@ -183,9 +184,10 @@ int wifi_set_twt()
 
 	/* STEP 2.3 - Send the TWT request with net_mgmt. */
 	
-
+	LOG_INF("-------------------------------");
 	LOG_INF("TWT operation %s requested", 
 			wifi_twt_operation_txt(params.operation));
+	LOG_INF("-------------------------------");
 	return 0;
 }
 
@@ -209,34 +211,6 @@ static int server_connect(void)
 		return -errno;
 	}
 
-	err = connect(sock, (struct sockaddr *)&server, sizeof(server));
-	if (err < 0) {
-		LOG_INF("Connecting to server failed, err: %d, %s", errno, strerror(errno));
-		return -errno;
-	}
-	LOG_INF("Connected to server");
-
-	return 0;
-}
-
-static int server_connect(void)
-{
-	int err;
-	server.sin_family = AF_INET;
-	server.sin_port = htons(SERVER_PORT);
-
-	err = inet_pton(AF_INET, SERVER_IPV4_ADDR, &server.sin_addr);
-	if (err <= 0) {
-		LOG_ERR("Invalid address, err: %d, %s", errno, strerror(errno));
-		close(sock);
-		return -errno;
-	}
-	sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-
-	if (sock < 0) {
-		LOG_INF("Failed to create socket, err: %d, %s", errno, strerror(errno));
-		return -errno;
-	}
 	err = connect(sock, (struct sockaddr *)&server, sizeof(server));
 	if (err < 0) {
 		LOG_INF("Connecting to server failed, err: %d, %s", errno, strerror(errno));
@@ -282,6 +256,7 @@ int receive_packet()
 
 	recv_buf[received] = 0;
 	LOG_INF("Data received from the server: (%s)", recv_buf);
+recv_counter++;
 
 	return 0;
 }
@@ -290,13 +265,12 @@ static void button_handler(uint32_t button_state, uint32_t has_changed)
 {
 	uint32_t button = button_state & has_changed;
 	
-	/* STEP x - Call wifi_set_twt() to enable or disable TWT when button 1 is pressed. */
+	/* STEP 5.1 - Call wifi_set_twt() to enable or disable TWT when button 1 is pressed. */
 	
 
-	/* You can also send a packet with button 2. */
-	if (button & DK_BTN2_MSK) {
-		send_packet();
-	}
+	/* STEP 5.2 - Enable or disable sending packets during TWT awake when button 2 is pressed. */
+
+
 }
 
 int main(void)
@@ -323,7 +297,9 @@ int main(void)
 
 	while (1) {
 		k_sleep(K_MSEC(1000));
+	if (recv_counter < counter) {
 		receive_packet();
+		}
 	}
 	close(sock);
 	return 0;

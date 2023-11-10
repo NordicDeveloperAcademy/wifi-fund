@@ -40,6 +40,7 @@ K_SEM_DEFINE(ipv4_obtained_sem, 0, 1);
 #define RECV_BUF_SIZE 256
 
 static int counter = 0;
+static int recv_counter = 0;
 
 static int sock;
 static struct sockaddr_in server;
@@ -51,11 +52,12 @@ int receive_packet();
 
 /* STEP 1.2 - Define macros for wakeup time and interval for TWT.  */
 #define TWT_WAKE_INTERVAL_MS 65
-#define TWT_INTERVAL_MS 	 5000
+#define TWT_INTERVAL_MS 	 7000
 
-/* STEP 1.3 - Create two variables to keep track of TWT status and flow ID. */
+/* STEP 1.3 - Create variables to keep track of TWT status, flow ID, and if sending packets is enabled. */
 bool nrf_wifi_twt_enabled = 0;
 static uint32_t twt_flow_id = 1;
+bool sending_packets_enabled = 0;
 
 static struct net_mgmt_event_callback wifi_mgmt_cb;
 static struct net_mgmt_event_callback ipv4_mgmt_cb;
@@ -76,10 +78,10 @@ static int wifi_args_to_params(struct wifi_connect_req_params *params)
 
 static void handle_wifi_twt_event(struct net_mgmt_event_callback *cb)
 {
-	/* STEP 4.1 - Create a wifi_twt_params struct for the TWT response and fill it with the response information. */
+	/* STEP 4.1 - Create a wifi_twt_params struct for the received TWT event and fill it with the event information. */
 	const struct wifi_twt_params *resp = (const struct wifi_twt_params *)cb->info;
 	
-	/* STEP 4.2 - If the TWT request was for TWT teardown, change the value of nrf_wifi_twt_enabled and exit the function. */
+	/* STEP 4.2 - If the event was a TWT teardown iniatiated by the AP, set change the value of nrf_wifi_twt_enabled and exit the function.  */
 	if (resp->operation == WIFI_TWT_TEARDOWN) {
 		LOG_INF("TWT teardown received for flow ID %d\n",
 		      resp->flow_id);
@@ -147,11 +149,11 @@ static void wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb,
 		break;
 	case NET_EVENT_WIFI_TWT_SLEEP_STATE:
 		/* STEP 3.2.2 -	Upon TWT sleep state event, inform the user of the current sleep state.
-		/* When the device is in the awake state, send a packet to the server and check for any received packets. */
+		 * When the device is in the awake state, send a packet to the server and check for any received packets if sending packets is enabled. */
 		int *twt_state;
 		twt_state = (int *)(cb->info);
 		LOG_INF("TWT sleep state: %s", *twt_state ? "awake" : "sleeping" );
-		if (*twt_state == WIFI_TWT_STATE_AWAKE) {
+		if ((*twt_state == WIFI_TWT_STATE_AWAKE) & sending_packets_enabled) {
 			send_packet();
 			receive_packet();
 		}
@@ -220,24 +222,24 @@ int wifi_set_twt()
 	struct wifi_twt_params params = { 0 };
 
 	params.negotiation_type = WIFI_TWT_INDIVIDUAL;
-	params.setup_cmd = WIFI_TWT_SETUP_CMD_REQUEST;
 	params.flow_id = twt_flow_id;
 	params.dialog_token = 1;
 
 	if (!nrf_wifi_twt_enabled){
 		/* STEP 2.2 - Fill in the TWT setup specific parameters of the wifi_twt_params struct. */
 		params.operation = WIFI_TWT_SETUP;
+		params.setup_cmd = WIFI_TWT_SETUP_CMD_REQUEST;
 		params.setup.responder = 0;
-		params.setup.trigger = 1;
+		params.setup.trigger = 0;
 		params.setup.implicit = 1;
-		params.setup.announce = 1;
+		params.setup.announce = 0;
 		params.setup.twt_wake_interval = TWT_WAKE_INTERVAL_MS * USEC_PER_MSEC;
 		params.setup.twt_interval = TWT_INTERVAL_MS * USEC_PER_MSEC;
 	}
 	else {
 		/* STEP 2.2.2 - Fill in the TWT teardown specific parameters of the wifi_twt_params struct. */
 		params.operation = WIFI_TWT_TEARDOWN;
-		params.teardown.teardown_all = 1;
+		params.setup_cmd = WIFI_TWT_TEARDOWN;
 		twt_flow_id = twt_flow_id<WIFI_MAX_TWT_FLOWS ? twt_flow_id+1 : 1;
 		nrf_wifi_twt_enabled = 0;
 	}
@@ -250,8 +252,10 @@ int wifi_set_twt()
 			wifi_twt_get_err_code_str(params.fail_reason));
 		return -1;
 	}
+	LOG_INF("-------------------------------");
 	LOG_INF("TWT operation %s requested", 
 			wifi_twt_operation_txt(params.operation));
+	LOG_INF("-------------------------------");
 	return 0;
 }
 
@@ -275,34 +279,6 @@ static int server_connect(void)
 		return -errno;
 	}
 
-	err = connect(sock, (struct sockaddr *)&server, sizeof(server));
-	if (err < 0) {
-		LOG_INF("Connecting to server failed, err: %d, %s", errno, strerror(errno));
-		return -errno;
-	}
-	LOG_INF("Connected to server");
-
-	return 0;
-}
-
-static int server_connect(void)
-{
-	int err;
-	server.sin_family = AF_INET;
-	server.sin_port = htons(SERVER_PORT);
-
-	err = inet_pton(AF_INET, SERVER_IPV4_ADDR, &server.sin_addr);
-	if (err <= 0) {
-		LOG_ERR("Invalid address, err: %d, %s", errno, strerror(errno));
-		close(sock);
-		return -errno;
-	}
-	sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-
-	if (sock < 0) {
-		LOG_INF("Failed to create socket, err: %d, %s", errno, strerror(errno));
-		return -errno;
-	}
 	err = connect(sock, (struct sockaddr *)&server, sizeof(server));
 	if (err < 0) {
 		LOG_INF("Connecting to server failed, err: %d, %s", errno, strerror(errno));
@@ -348,6 +324,7 @@ int receive_packet()
 
 	recv_buf[received] = 0;
 	LOG_INF("Data received from the server: (%s)", recv_buf);
+	recv_counter++;
 
 	return 0;
 }
@@ -356,14 +333,15 @@ static void button_handler(uint32_t button_state, uint32_t has_changed)
 {
 	uint32_t button = button_state & has_changed;
 	
-	/* STEP x - Call wifi_set_twt() to enable or disable TWT when button 1 is pressed. */
+	/* STEP 5.1 - Call wifi_set_twt() to enable or disable TWT when button 1 is pressed. */
 	if (button & DK_BTN1_MSK) {
 		wifi_set_twt();
 	}
 
-	/* You can also send a packet with button 2. */
+	/* STEP 5.2 - Enable or disable sending packets during TWT awake when button 2 is pressed. */
 	if (button & DK_BTN2_MSK) {
-		send_packet();
+		sending_packets_enabled = !sending_packets_enabled;
+		LOG_INF("Sending packets %s", sending_packets_enabled ? "enabled" : "disabled" );
 	}
 }
 
@@ -391,7 +369,9 @@ int main(void)
 
 	while (1) {
 		k_sleep(K_MSEC(1000));
-		receive_packet();
+		if (recv_counter < counter) {
+			receive_packet();
+		}
 	}
 	close(sock);
 	return 0;
