@@ -19,25 +19,29 @@
 /* STEP 1.2 - Include the header file of the HTTP client library */
 
 
-
 LOG_MODULE_REGISTER(Lesson5_Exercise1, LOG_LEVEL_INF);
+
 K_SEM_DEFINE(wifi_connected_sem, 0, 1);
+K_SEM_DEFINE(ipv4_obtained_sem, 0, 1);
+
+#define WIFI_MGMT_EVENTS (NET_EVENT_WIFI_CONNECT_RESULT | \
+				NET_EVENT_WIFI_DISCONNECT_RESULT)
+
+#define IPV4_MGMT_EVENTS (NET_EVENT_IPV4_ADDR_ADD | \
+				NET_EVENT_IPV4_ADDR_DEL)
 
 /* STEP 2 - Define the macros for the HTTP server hostname and port */
-
 
 /* STEP 3 - Declare the necessary buffers for receiving messages */
 
 
 /* STEP 4 - Define the variable for the counter as 0 */
 
-
 static int sock;
 static struct sockaddr_storage server;
 
-
-
-static struct net_mgmt_event_callback wifi_connect_cb;
+static struct net_mgmt_event_callback wifi_mgmt_cb;
+static struct net_mgmt_event_callback ipv4_mgmt_cb;
 
 static int wifi_args_to_params(struct wifi_connect_req_params *params)
 {
@@ -54,7 +58,7 @@ static int wifi_args_to_params(struct wifi_connect_req_params *params)
 	return 0;
 }
 
-static void wifi_connect_handler(struct net_mgmt_event_callback *cb,
+static void wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb,
 				    uint32_t mgmt_event, struct net_if *iface)
 {
 	switch (mgmt_event) {
@@ -63,8 +67,30 @@ static void wifi_connect_handler(struct net_mgmt_event_callback *cb,
         dk_set_led_on(DK_LED1);
 		k_sem_give(&wifi_connected_sem);
 		break;
+	case NET_EVENT_WIFI_DISCONNECT_RESULT:
+		LOG_INF("Disconnected from Wi-Fi Network");
+        dk_set_led_off(DK_LED1);
+		break;		
 	default:
+        LOG_ERR("Unknown event: %d", mgmt_event);
 		break;
+	}
+}
+
+static void ipv4_mgmt_event_handler(struct net_mgmt_event_callback *cb,
+				    uint32_t event, struct net_if *iface)
+{
+	switch (event) {
+	case NET_EVENT_IPV4_ADDR_ADD:
+		LOG_INF("IPv4 address acquired");
+		k_sem_give(&ipv4_obtained_sem);
+		break;
+	case NET_EVENT_IPV4_ADDR_DEL:
+		LOG_INF("IPv4 address lost");
+		break;
+	default:
+		LOG_DBG("Unknown event: 0x%08X", event);
+		return;
 	}
 }
 
@@ -79,8 +105,10 @@ static int wifi_connect() {
 	/* Sleep to allow initialization of Wi-Fi driver */
 	k_sleep(K_SECONDS(1));
 
-	net_mgmt_init_event_callback(&wifi_connect_cb, wifi_connect_handler, NET_EVENT_WIFI_CONNECT_RESULT);
-	net_mgmt_add_event_callback(&wifi_connect_cb);
+	net_mgmt_init_event_callback(&wifi_mgmt_cb, wifi_mgmt_event_handler, WIFI_MGMT_EVENTS);
+	net_mgmt_add_event_callback(&wifi_mgmt_cb);
+	net_mgmt_init_event_callback(&ipv4_mgmt_cb, ipv4_mgmt_event_handler, IPV4_MGMT_EVENTS);
+	net_mgmt_add_event_callback(&ipv4_mgmt_cb);
 
 	wifi_args_to_params(&cnx_params);
 
@@ -91,7 +119,8 @@ static int wifi_connect() {
 		return ENOEXEC;
 	}
 	k_sem_take(&wifi_connected_sem, K_FOREVER);
-	k_sleep(K_SECONDS(6));
+	k_sem_take(&ipv4_obtained_sem, K_FOREVER);
+	
 
 	return 0;
 }
@@ -137,7 +166,7 @@ static int server_connect(void)
 	int err;
 	sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (sock < 0) {
-		LOG_INF("Failed to set up HTTP socket, err: %d, %s", errno, strerror(errno));
+		LOG_INF("Failed to create socket, err: %d, %s", errno, strerror(errno));
 		return -errno;
 	}
 
@@ -158,7 +187,7 @@ static void response_cb(struct http_response *rsp,
                         void *user_data)
 {	
 	/* STEP 9 - Define the callback function to print the body */
-
+	
 }
 
 static void client_id_cb(struct http_response *rsp,
@@ -166,30 +195,25 @@ static void client_id_cb(struct http_response *rsp,
                         void *user_data)
 {
 	/* STEP 6.1 - Log the HTTP response status */
-
+	
 	/* STEP 6.2 - Retrieve and format the client ID */
-
+	
 }
 
 static int client_http_put(void)
 {
-	int ret = 0;
-
 	/* STEP 7 - Define the function to send a PUT request to the HTTP server */
 
-	return ret;
 }
 
 static int client_http_get(void)
 {
-	int ret = 0;
 	/* STEP 8 - Define the function to send a GET request to the HTTP server */
 
-	return ret;
 }
 
 static int client_get_new_id(void){
-	int ret = 0;
+	int err = 0;
 
 	/* STEP 5.1 - Define the structure http_request and fill the block of memory */
 
@@ -197,13 +221,13 @@ static int client_get_new_id(void){
 
 	/* STEP 5.3 - Send the request to the HTTP server */
 
-	return ret;
+	return err;
 }
 
 static void button_handler(uint32_t button_state, uint32_t has_changed)
 {
 	/* STEP 10 - Define the button handler to send requests upon button triggers */
-
+	
 }
 
 int main(void)
@@ -234,6 +258,7 @@ int main(void)
 
 	while (1) {
 		k_sleep(K_FOREVER);
+		
 
 	}
 

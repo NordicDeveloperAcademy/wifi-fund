@@ -9,13 +9,56 @@ tests:
       - nrf7002dk_nrf5340_cpuapp
     platform_allow: nrf7002dk_nrf5340_cpuapp
     tags: ci_build
+  sample.nrf7001.shell:
+    build_only: true
+    integration_platforms:
+      - nrf7002dk_nrf7001_nrf5340_cpuapp
+    platform_allow: nrf7002dk_nrf7001_nrf5340_cpuapp
+    tags: ci_build
   sample.nrf7002_eks.shell:
     build_only: true
-    extra_args: SHIELD=nrf7002_ek
+    extra_args: SHIELD=nrf7002ek
     integration_platforms:
       - nrf5340dk_nrf5340_cpuapp
       - nrf52840dk_nrf52840
     platform_allow: nrf5340dk_nrf5340_cpuapp nrf52840dk_nrf52840
+    tags: ci_build
+  sample.nrf7000_eks.shell:
+    build_only: true
+    extra_args: SHIELD=nrf7002ek_nrf7000 CONFIG_WPA_SUPP=n
+    integration_platforms:
+      - nrf5340dk_nrf5340_cpuapp
+      - nrf52840dk_nrf52840
+    platform_allow: nrf5340dk_nrf5340_cpuapp nrf52840dk_nrf52840
+    tags: ci_build
+  sample.nrf7001_eks.shell:
+    build_only: true
+    extra_args: SHIELD=nrf7002ek_nrf7001
+    integration_platforms:
+      - nrf5340dk_nrf5340_cpuapp
+      - nrf52840dk_nrf52840
+    platform_allow: nrf5340dk_nrf5340_cpuapp nrf52840dk_nrf52840
+    tags: ci_build
+  sample.nrf7002_eks_cpunet.shell:
+    build_only: true
+    extra_args: SHIELD=nrf7002ek CONFIG_BOARD_ENABLE_CPUNET=y
+    integration_platforms:
+      - nrf5340dk_nrf5340_cpuapp
+    platform_allow: nrf5340dk_nrf5340_cpuapp
+    tags: ci_build
+  sample.nrf7000_eks_cpunet.shell:
+    build_only: true
+    extra_args: SHIELD=nrf7002ek_nrf7000 CONFIG_BOARD_ENABLE_CPUNET=y CONFIG_WPA_SUPP=n
+    integration_platforms:
+      - nrf5340dk_nrf5340_cpuapp
+    platform_allow: nrf5340dk_nrf5340_cpuapp
+    tags: ci_build
+  sample.nrf7001_eks_cpunet.shell:
+    build_only: true
+    extra_args: SHIELD=nrf7002ek_nrf7001 CONFIG_BOARD_ENABLE_CPUNET=y
+    integration_platforms:
+      - nrf5340dk_nrf5340_cpuapp
+    platform_allow: nrf5340dk_nrf5340_cpuapp
     tags: ci_build
   sample.nrf7002.shell.zperf:
     build_only: true
@@ -24,12 +67,26 @@ tests:
       - nrf7002dk_nrf5340_cpuapp
     platform_allow: nrf7002dk_nrf5340_cpuapp
     tags: ci_build
+  sample.nrf7001.shell.zperf:
+    build_only: true
+    extra_args: OVERLAY_CONFIG=overlay-zperf.conf
+    integration_platforms:
+      - nrf7002dk_nrf7001_nrf5340_cpuapp
+    platform_allow: nrf7002dk_nrf7001_nrf5340_cpuapp
+    tags: ci_build
   sample.nrf7002.shell.wpa_cli:
     build_only: true
     extra_args: CONFIG_WPA_CLI=y
     integration_platforms:
       - nrf7002dk_nrf5340_cpuapp
     platform_allow: nrf7002dk_nrf5340_cpuapp
+    tags: ci_build
+  sample.nrf7001.shell.wpa_cli:
+    build_only: true
+    extra_args: CONFIG_WPA_CLI=y
+    integration_platforms:
+      - nrf7002dk_nrf7001_nrf5340_cpuapp
+    platform_allow: nrf7002dk_nrf7001_nrf5340_cpuapp
     tags: ci_build
   sample.nrf7002.shell.scan_only_7002:
     build_only: true
@@ -40,7 +97,21 @@ tests:
     tags: ci_build
   sample.nrf7002.shell.scan_only_9160:
     build_only: true
-    extra_args: OVERLAY_CONFIG=overlay-scan-only.conf SHIELD=nrf7002_ek
+    extra_args: OVERLAY_CONFIG=overlay-scan-only.conf SHIELD=nrf7002ek
+    integration_platforms:
+      - nrf9160dk_nrf9160_ns
+    platform_allow: nrf9160dk_nrf9160_ns
+    tags: ci_build
+  sample.nrf7000.shell.scan_only_9160:
+    build_only: true
+    extra_args: OVERLAY_CONFIG=overlay-scan-only.conf SHIELD=nrf7002ek_nrf7000 CONFIG_WPA_SUPP=n
+    integration_platforms:
+      - nrf9160dk_nrf9160_ns
+    platform_allow: nrf9160dk_nrf9160_ns
+    tags: ci_build
+  sample.nrf7001.shell.scan_only_9160:
+    build_only: true
+    extra_args: OVERLAY_CONFIG=overlay-scan-only.conf SHIELD=nrf7002ek_nrf7001
     integration_platforms:
       - nrf9160dk_nrf9160_ns
     platform_allow: nrf9160dk_nrf9160_ns
@@ -59,3 +130,82 @@ tests:
       - nrf7002dk_nrf5340_cpuapp
     platform_allow: nrf7002dk_nrf5340_cpuapp
     tags: ci_build
+  sample.nrf7002_ns.shell:
+    build_only: true
+    extra_args: OVERLAY_CONFIG=overlay-tfm.conf
+    integration_platforms:
+      - nrf7002dk_nrf5340_cpuapp_ns
+    platform_allow: nrf7002dk_nrf5340_cpuapp_ns
+  sample.nrf7002_eb.thingy53.shell:
+    build_only: true
+    extra_args: SHIELD=nrf7002eb CONFIG_BOARD_ENABLE_CPUNET=y
+    integration_platforms:
+      - thingy53_nrf5340_cpuapp
+    platform_allow: thingy53_nrf5340_cpuapp
+    tags: ci_build
+  # Used by QA and also acts as a memory stress test
+  sample.nrf7001.superset:
+    build_only: true
+    extra_args:
+      OVERLAY_CONFIG=overlay-zperf.conf
+      CONFIG_NRF700X_UTIL=y
+      CONFIG_WPA_CLI=y
+      CONFIG_NET_IPV4_FRAGMENT=y
+      CONFIG_NET_IPV4_FRAGMENT_MAX_PKT=24
+    integration_platforms:
+      - nrf7002dk_nrf7001_nrf5340_cpuapp
+    platform_allow: nrf7002dk_nrf7001_nrf5340_cpuapp
+    tags: ci_build_superset
+  # Used by QA and also acts as a memory stress test
+  sample.nrf7001_ek.superset:
+    build_only: true
+    extra_args:
+      SHIELD=nrf7002ek_nrf7001
+      OVERLAY_CONFIG=overlay-zperf.conf
+      CONFIG_NRF700X_UTIL=y
+      CONFIG_WPA_CLI=y
+      CONFIG_NET_IPV4_FRAGMENT=y
+      CONFIG_NET_IPV4_FRAGMENT_MAX_PKT=24
+    integration_platforms:
+      - nrf5340dk_nrf5340_cpuapp
+    platform_allow: nrf5340dk_nrf5340_cpuapp
+    tags: ci_build_superset
+  # Used by QA and also acts as a memory stress test
+  sample.nrf7002.superset:
+    build_only: true
+    extra_args:
+      OVERLAY_CONFIG=overlay-zperf.conf
+      CONFIG_NRF700X_UTIL=y
+      CONFIG_WPA_CLI=y
+      CONFIG_NET_IPV4_FRAGMENT=y
+      CONFIG_NET_IPV4_FRAGMENT_MAX_PKT=24
+    integration_platforms:
+      - nrf7002dk_nrf5340_cpuapp
+    platform_allow: nrf7002dk_nrf5340_cpuapp
+    tags: ci_build_superset
+  # Used by QA and also acts as a memory stress test
+  sample.nrf7002_ek.superset:
+    build_only: true
+    extra_args:
+      SHIELD=nrf7002ek
+      OVERLAY_CONFIG=overlay-zperf.conf
+      CONFIG_NRF700X_UTIL=y
+      CONFIG_WPA_CLI=y
+      CONFIG_NET_IPV4_FRAGMENT=y
+      CONFIG_NET_IPV4_FRAGMENT_MAX_PKT=24
+    integration_platforms:
+      - nrf5340dk_nrf5340_cpuapp
+    platform_allow: nrf5340dk_nrf5340_cpuapp
+    tags: ci_build_superset
+  sample.nrf7002.superset.debug:
+    build_only: true
+    extra_args:
+      OVERLAY_CONFIG=overlay-debug.conf;overlay-zperf.conf
+      CONFIG_NRF700X_UTIL=y
+      CONFIG_WPA_CLI=y
+      CONFIG_NET_IPV4_FRAGMENT=y
+      CONFIG_NET_IPV4_FRAGMENT_MAX_PKT=24
+    integration_platforms:
+      - nrf7002dk_nrf5340_cpuapp
+    platform_allow: nrf7002dk_nrf5340_cpuapp
+    tags: ci_build_superset

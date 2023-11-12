@@ -19,7 +19,7 @@ LOG_MODULE_REGISTER(Lesson2_Exercise2, LOG_LEVEL_INF);
 /* STEP 12.1 Define a macro for the IPv4 events to watch */
 #define IPV4_MGMT_EVENTS (NET_EVENT_IPV4_ADDR_ADD | NET_EVENT_IPV4_ADDR_DEL)
 
-/* STEP 5 - Declare the callback structure for Wi-Fi events */
+/* STEP 5 - Declare and define the callback structure for Wi-Fi events */
 static struct net_mgmt_event_callback wifi_mgmt_cb;
 /* STEP 12.2 Declare the callback structure for IPv4 events */
 static struct net_mgmt_event_callback ipv4_mgmt_cb;

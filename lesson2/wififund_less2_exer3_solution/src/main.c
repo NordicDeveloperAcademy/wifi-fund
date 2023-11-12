@@ -330,6 +330,8 @@ int main(void)
 	bt_set_name(device_name_str);
 
 	/* STEP 11.2 - Start advertising */
+	update_wifi_status_in_adv();
+	
 	err = bt_le_adv_start(prov_svc_data[ADV_DATA_FLAG_IDX] & ADV_DATA_FLAG_PROV_STATUS_BIT ?
 		PROV_BT_LE_ADV_PARAM_SLOW : PROV_BT_LE_ADV_PARAM_FAST,
 		ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
@@ -339,7 +341,7 @@ int main(void)
 	}
 	LOG_INF("BT Advertising successfully started.\n");
 
-	update_wifi_status_in_adv();
+	
 
 	k_work_queue_init(&adv_daemon_work_q);
 	k_work_queue_start(&adv_daemon_work_q, adv_daemon_stack_area,

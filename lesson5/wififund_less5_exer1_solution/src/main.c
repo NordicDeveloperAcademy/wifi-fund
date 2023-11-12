@@ -218,7 +218,7 @@ static void client_id_cb(struct http_response *rsp,
 	client_id_buf[0]='/';
 	strcat(client_id_buf,client_id_buf_tmp);
 
-	LOG_INF("Succesfully aquired client ID: %s", client_id_buf);
+	LOG_INF("Successfully acquired client ID: %s", client_id_buf);
 }
 
 static int client_http_put(void)
@@ -261,7 +261,6 @@ static int client_http_get(void)
 	/* STEP 8 - Define the function to send a GET request to the HTTP server */
 	int err = 0;
 	struct http_request req;
-
 	memset(&req, 0, sizeof(req));
 
 	req.method = HTTP_GET;

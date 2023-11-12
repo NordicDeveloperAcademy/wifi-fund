@@ -128,19 +128,23 @@ static void udp_upload_results_cb(enum zperf_status status,
 	switch (status) {
 	case ZPERF_SESSION_STARTED:
 		/* STEP 7.1 - Inform the user that the UDP session has started */
+		
 		break;
 	case ZPERF_SESSION_FINISHED:
 		LOG_INF("Wi-Fi throughput test: Upload completed!");
 		/* STEP 7.2 - If client_time_in_us is not zero, calculate the throughput rate in kilobit per second. Otherwise, set it to zero */
+		
 		if (result->client_time_in_us != 0U) {
 
 		} else {
 			
 		}
 		/* STEP 7.3 - Print the results of the throughput test */
+
 		break;
 	case ZPERF_SESSION_ERROR:
 		/* STEP 7.4 - Inform the user that there is an error with the UDP session */
+
 		break;
 	}
 }

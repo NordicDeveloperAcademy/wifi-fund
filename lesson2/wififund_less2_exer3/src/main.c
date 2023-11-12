@@ -268,6 +268,6 @@ int main(void)
 
 	/* STEP 13.2 Apply stored credentials and request a Wi-FI connection*/
 
-	wifi_register_cb(void);
+	wifi_register_cb();
 	k_sem_take(&wifi_connected_sem, K_FOREVER);
 }

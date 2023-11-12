@@ -178,7 +178,7 @@ int main(void)
 	LOG_INF("Press button 1 on your DK to send your message");
 
 	while (1) {
-		/* STEP 10 - Listen for incoming messages */
+		/* STEP 11 - Listen for incoming messages */
 			
 	 	}
 	close(sock);

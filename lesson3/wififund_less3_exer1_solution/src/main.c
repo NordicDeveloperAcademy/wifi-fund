@@ -238,7 +238,7 @@ int main(void)
 	LOG_INF("Press button 1 on your DK to send your message");
 
 	while (1) {
-		/* STEP 10 - Listen for incoming messages */
+		/* STEP 11 - Listen for incoming messages */
 		received = recv(sock, recv_buf, sizeof(recv_buf) - 1, 0);
 
 	 		if (received < 0) {

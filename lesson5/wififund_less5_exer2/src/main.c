@@ -233,7 +233,7 @@ static void client_id_cb(struct http_response *rsp,
 	client_id_buf[0]='/';
 	strcat(client_id_buf,client_id_buf_tmp);
 
-	LOG_INF("Succesfully aquired client ID: %s", client_id_buf);
+	LOG_INF("Successfully acquired client ID: %s", client_id_buf);
 }
 
 static int client_http_put(void)

@@ -19,13 +19,11 @@
 #include <zephyr/net/socket.h>
 #include <zephyr/net/mqtt.h>
 
-/* STEP 1.4 - Include the header file for the TLS credentials library */
-#include <zephyr/net/tls_credentials.h>
+/* STEP 1.5 - Include the header file for the TLS credentials library */
+
 
 /* STEP 2.3 - Include the certificate */
-static const unsigned char ca_certificate[] = {
-#include "certificate.h"
-};
+
 
 LOG_MODULE_REGISTER(Lesson4_Exercise2, LOG_LEVEL_INF);
 
@@ -42,7 +40,7 @@ K_SEM_DEFINE(ipv4_obtained_sem, 0, 1);
 #define CLIENT_ID_LEN sizeof(CONFIG_BOARD) + 11
 
 /* STEP 3.1 - Define a macro for the credential security tag */
-#define MQTT_TLS_SEC_TAG 24
+
 
 static struct net_mgmt_event_callback wifi_mgmt_cb;
 static struct net_mgmt_event_callback ipv4_mgmt_cb;
@@ -380,17 +378,7 @@ int client_init(struct mqtt_client *client)
 	client->tx_buf_size = sizeof(tx_buffer);
 
 	/* STEP 4 - Set the transport type to secure */
-	struct mqtt_sec_config *tls_cfg = &(client->transport).tls.config;
-	static sec_tag_t sec_tag_list[] = { MQTT_TLS_SEC_TAG };
-
-	client->transport.type = MQTT_TRANSPORT_SECURE;
-	
-	tls_cfg->peer_verify = TLS_PEER_VERIFY_OPTIONAL;
-	tls_cfg->cipher_list = NULL;
-	tls_cfg->sec_tag_count = ARRAY_SIZE(sec_tag_list);
-	tls_cfg->sec_tag_list = sec_tag_list;
-	tls_cfg->session_cache = TLS_SESSION_CACHE_DISABLED;
-	tls_cfg->hostname = CONFIG_MQTT_BROKER_HOSTNAME;
+	client->transport.type = MQTT_TRANSPORT_NON_SECURE;
 	
 	return err;
 }
@@ -431,11 +419,7 @@ int main(void)
 	}
 	
 	/* STEP 3.2 - Store the credential on the device */
-	err = tls_credential_add(MQTT_TLS_SEC_TAG, TLS_CREDENTIAL_CA_CERTIFICATE, ca_certificate, sizeof(ca_certificate));
-	if (err < 0) {
-		LOG_ERR("Failed to add TLS credentials, err: %d", err);
-		return err;
-	}
+	
 
 	LOG_INF("Connecting to MQTT broker");
 
@@ -452,7 +436,7 @@ int main(void)
 	}
 
 	/* STEP 5 - Update the file descriptor to use the TLS socket */
-	(&fds)->fd = (&client)->transport.tls.sock;
+	(&fds)->fd = (&client)->transport.tcp.sock;
 	(&fds)->events = POLLIN;
 
 	while (1) {

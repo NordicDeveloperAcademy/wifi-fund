@@ -7,26 +7,31 @@ Wi-Fi: Provisioning Service
    :local:
    :depth: 2
 
-This sample demonstrates how to provision a Wi-Fi® device over a Bluetooth® Low Energy link.
+The Provisioning Service sample demonstrates how to provision a Wi-Fi® device over a Bluetooth® Low Energy link.
 
 .. _wifi_provisioning_app:
 
 Requirements
 ************
 
-The sample supports the following development kit:
+The sample supports the following development kits:
 
 .. table-from-sample-yaml::
 
 The sample requires a smartphone (configurator) with Nordic Semiconductor's nRF Wi-Fi Provisioner app installed in one of the following versions:
 
 * `nRF Wi-Fi Provisioner mobile app for Android`_
+
+   * `Source code for nRF Wi-Fi Provisioner mobile app for Android`_
+
 * `nRF Wi-Fi Provisioner mobile app for iOS`_
+
+   * `Source code for nRF Wi-Fi Provisioner mobile app for iOS`_
 
 Overview
 ********
 
-With this sample, you can provision a Wi-Fi device that lacks input or output capability using the :ref:`wifi_prov_readme` library.
+With this sample, you can provision a Wi-Fi device that lacks input or output capability, using the :ref:`wifi_prov_readme` library.
 The sample is divided into three parts:
 
 * Task and event handling component: Handles provisioning-related tasks and events.
@@ -38,17 +43,32 @@ Configuration
 
 |config|
 
-You can enable the :kconfig:option:`WIFI_PROV_ADV_DATA_UPDATE` Kconfig option to get the live update of the Wi-Fi status without setting up a Bluetooth connection.
-When periodic update is enabled, the update interval is controlled by the :kconfig:option:`WIFI_PROV_ADV_DATA_UPDATE_INTERVAL` Kconfig option.
+Configuration options
+=====================
+
+The following sample-specific Kconfig options are used in this sample (located in :file:`samples/wifi/provisioning/Kconfig`):
+
+.. _CONFIG_WIFI_PROV_ADV_DATA_UPDATE:
+
+CONFIG_WIFI_PROV_ADV_DATA_UPDATE
+   This option enables periodic updates of advertisement data.
+
+.. _CONFIG_WIFI_PROV_ADV_DATA_UPDATE_INTERVAL:
+
+CONFIG_WIFI_PROV_ADV_DATA_UPDATE_INTERVAL
+   This option specifies the update interval of the advertisement data.
+
+To get live update of the Wi-Fi status without setting up a Bluetooth connection, enable the :ref:`CONFIG_WIFI_PROV_ADV_DATA_UPDATE <CONFIG_WIFI_PROV_ADV_DATA_UPDATE>` Kconfig option.
+Set the :ref:`CONFIG_WIFI_PROV_ADV_DATA_UPDATE_INTERVAL <CONFIG_WIFI_PROV_ADV_DATA_UPDATE_INTERVAL>` Kconfig option, to control the update interval.
 
 Features
 ********
 
-The sample implements advertisement feature to advertise over Bluetooth LE.
+The sample implements advertising over Bluetooth LE.
 
-After powerup, the device checks if it is provisioned. If it is, it loads saved credentials and tries to connect to the specified access point.
+After powerup, the device checks whether it is provisioned. If it is, it loads saved credentials and tries to connect to the specified access point.
 
-Then, the device advertises over Bluetooth LE.
+The device advertises over Bluetooth LE.
 
 The advertising data contains several fields to facilitate provisioning.
 It contains the UUID of the Wi-Fi Provisioning Service and four bytes of service data, as described in the following table.
@@ -63,16 +83,16 @@ It contains the UUID of the Wi-Fi Provisioning Service and four bytes of service
 
 * Flag: 16-bit little endian field. Byte 2 (first byte on air) is LSB, and Byte 3 (second byte on air) is MSB.
 
-  * Bit 0: provisioning status. The value is ``1`` if the device is provisioned, otherwise it is ``0``.
+  * Bit 0: Provisioning status. The value is ``1`` if the device is provisioned, otherwise it is ``0``.
 
-  * Bit 1: connection status. The value is ``1`` if Wi-Fi is connected, otherwise it is ``0``.
+  * Bit 1: Connection status. The value is ``1`` if Wi-Fi is connected, otherwise it is ``0``.
 
   * Bit 2 - 15: RFU
 
 * RSSI: 8-bit signed integer. The value is the signal strength. It is valid only if the Wi-Fi is connected.
 
 The advertising interval depends on the provisioning status.
-If the device is not provisioned, the interval is 100 ms. If it is provisioned, the interval is 1 second.
+If the device is not provisioned, the interval is 100 ms. If it is provisioned, the interval is one second.
 
 Building and running
 ********************
