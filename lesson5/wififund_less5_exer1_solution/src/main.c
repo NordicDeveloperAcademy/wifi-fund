@@ -29,7 +29,7 @@ LOG_MODULE_REGISTER(Lesson5_Exercise1, LOG_LEVEL_INF);
 #define EVENT_MASK (NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED)
 
 /* STEP 2 - Define the macros for the HTTP server hostname and port */
-#define HTTP_HOSTNAME "d1jglomgqgmujc.cloudfront.net"
+#define HTTP_HOSTNAME "echo.thingy.rocks"
 #define HTTP_PORT     80
 
 /* STEP 3 - Declare the necessary buffers for receiving messages */

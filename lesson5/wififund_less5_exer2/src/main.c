@@ -35,7 +35,7 @@ LOG_MODULE_REGISTER(Lesson5_Exercise2, LOG_LEVEL_INF);
 /* STEP 4.1 - Define a macro for the credential security tag */
 
 
-#define HTTP_HOSTNAME "d1jglomgqgmujc.cloudfront.net"
+#define HTTP_HOSTNAME "echo.thingy.rocks"
 /* STEP 3 - Change the HTTP port numer */
 #define HTTP_PORT     80
 
