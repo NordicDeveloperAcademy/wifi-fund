@@ -94,7 +94,7 @@ static int server_resolve(void)
 
 	char ipv4_addr[NET_IPV4_ADDR_LEN];
 	inet_ntop(AF_INET, &server4->sin_addr.s_addr, ipv4_addr, sizeof(ipv4_addr));
-	LOG_INF("IPv4 Address found %s", ipv4_addr);
+	LOG_INF("IPv4 address of HTTP server found %s", ipv4_addr);
 
 	freeaddrinfo(result);
 
@@ -116,6 +116,7 @@ static int server_connect(void)
 		return -errno;
 	}
 
+LOG_INF("Connected to server");
 	return 0;
 }
 
@@ -132,6 +133,8 @@ static void client_id_cb(struct http_response *rsp, enum http_final_call final_d
 
 
 	/* STEP 6.2 - Retrieve and format the client ID */
+
+	/* STEP 6.3 - Close the socket */
 
 }
 
@@ -197,7 +200,6 @@ int main(void)
 		LOG_ERR("Failed to initialize client");
 		return 0;
 	}
-	LOG_INF("Successfully connected to HTTP server");
 
 	/* STEP 11 - Retrieve the client ID upon connection */
 

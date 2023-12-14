@@ -99,7 +99,7 @@ static int server_resolve(void)
 
 	char ipv4_addr[NET_IPV4_ADDR_LEN];
 	inet_ntop(AF_INET, &server4->sin_addr.s_addr, ipv4_addr, sizeof(ipv4_addr));
-	LOG_INF("IPv4 Address found %s", ipv4_addr);
+	LOG_INF("IPv4 address of HTTP server found %s", ipv4_addr);
 
 	freeaddrinfo(result);
 
@@ -121,6 +121,7 @@ static int server_connect(void)
 		return -errno;
 	}
 
+	LOG_INF("Connected to server");
 	return 0;
 }
 
@@ -135,6 +136,9 @@ static void response_cb(struct http_response *rsp, enum http_final_call final_da
 		body_buf[rsp->body_frag_len] = '\0';
 		LOG_INF("Received: %s", body_buf);
 	}
+
+	LOG_INF("Closing socket: %d", sock);
+	close(sock);
 }
 
 static void client_id_cb(struct http_response *rsp, enum http_final_call final_data,
@@ -151,6 +155,10 @@ static void client_id_cb(struct http_response *rsp, enum http_final_call final_d
 	strcat(client_id_buf, client_id_buf_tmp);
 
 	LOG_INF("Successfully acquired client ID: %s", client_id_buf);
+
+	/* STEP 6.3 - Close the socket */
+	LOG_INF("Closing socket: %d", sock);
+	close(sock);
 }
 
 static int client_http_put(void)
@@ -186,7 +194,7 @@ static int client_http_put(void)
 	if (err < 0) {
 		LOG_ERR("Failed to send HTTP PUT request %s, err: %d", buffer, err);
 	}
-	close(sock);
+
 	return err;
 }
 
@@ -214,7 +222,6 @@ static int client_http_get(void)
 		LOG_ERR("Failed to send HTTP GET request, err: %d", err);
 	}
 
-	close(sock);
 	return err;
 }
 
@@ -239,7 +246,6 @@ static int client_get_new_id(void)
 
 	/* STEP 5.3 - Send the request to the HTTP server */
 	err = http_client_req(sock, &req, 5000, NULL);
-	close(sock);
 
 	return err;
 }
@@ -286,8 +292,7 @@ int main(void)
 	if (server_connect() != 0) {
 		LOG_ERR("Failed to initialize client");
 		return 0;
-	}
-	LOG_INF("Successfully connected to HTTP server");
+	}	
 
 	/* STEP 11 - Retrieve the client ID upon connection */
 	if (client_get_new_id() < 0) {
