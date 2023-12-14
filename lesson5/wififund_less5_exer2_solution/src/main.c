@@ -160,6 +160,7 @@ static int server_connect(void)
 		return -errno;
 	}
 
+	LOG_INF("Connected to server");
 	return 0;
 }
 
@@ -173,6 +174,9 @@ static void response_cb(struct http_response *rsp, enum http_final_call final_da
 		body_buf[rsp->body_frag_len] = '\0';
 		LOG_INF("Received: %s", body_buf);
 	}
+
+	LOG_INF("Closing socket: %d", sock);
+	close(sock);	
 }
 
 static void client_id_cb(struct http_response *rsp, enum http_final_call final_data,
@@ -187,6 +191,8 @@ static void client_id_cb(struct http_response *rsp, enum http_final_call final_d
 	strcat(client_id_buf, client_id_buf_tmp);
 
 	LOG_INF("Successfully acquired client ID: %s", client_id_buf);
+	LOG_INF("Closing socket: %d", sock);
+	close(sock);
 }
 
 static int client_http_put(void)
@@ -204,6 +210,7 @@ static int client_http_put(void)
 		LOG_INF("Unable to write to buffer, err: %d", bytes_written);
 		return bytes_written;
 	}
+
 	req.header_fields = headers;
 	req.method = HTTP_PUT;
 	req.url = client_id_buf;
@@ -221,7 +228,6 @@ static int client_http_put(void)
 		LOG_ERR("Failed to send HTTP PUT request %s, err: %d", buffer, err);
 	}
 	
-	close(sock);
 	return err;
 }
 
@@ -248,7 +254,6 @@ static int client_http_get(void)
 		LOG_ERR("Failed to send HTTP GET request, err: %d", err);
 	}
 
-	close(sock);
 	return err;
 }
 
@@ -269,8 +274,11 @@ static int client_get_new_id(void)
 	req.recv_buf = recv_buf;
 	req.recv_buf_len = sizeof(recv_buf);
 
+	LOG_INF("HTTP POST request");
 	err = http_client_req(sock, &req, 5000, NULL);
-	close(sock);
+	if (err < 0) {
+		LOG_ERR("Failed to send HTTP POST request, err: %d", err);
+	}
 	return err;
 }
 
@@ -321,13 +329,10 @@ int main(void)
 		return 0;
 	}
 
-	LOG_INF("Successfully connected to HTTP server");
-
 	if (client_get_new_id() < 0) {
 		LOG_ERR("Failed to get client ID");
 		return 0;
 	}
 
-	close(sock);
 	return 0;
 }
