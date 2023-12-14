@@ -245,8 +245,11 @@ static int client_get_new_id(void)
 	req.recv_buf_len = sizeof(recv_buf);
 
 	/* STEP 5.3 - Send the request to the HTTP server */
+	LOG_INF("HTTP POST request");
 	err = http_client_req(sock, &req, 5000, NULL);
-
+	if (err < 0) {
+		LOG_ERR("Failed to send HTTP POST request, err: %d", err);
+	}
 	return err;
 }
 
