@@ -78,6 +78,7 @@ static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb,
 	//params->security = WIFI_SECURITY_TYPE_PSK;
 	//params->mfp = WIFI_MFP_OPTIONAL;
 	//params->timeout = SYS_FOREVER_MS;
+	//params->band = WIFI_FREQ_BAND_UNKNOWN;
 
 	//return 0;
 //}
