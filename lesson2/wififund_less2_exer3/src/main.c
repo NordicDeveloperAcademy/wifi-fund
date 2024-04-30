@@ -24,7 +24,35 @@
 
 
 LOG_MODULE_REGISTER(Lesson2_Exercise3, LOG_LEVEL_INF);
-K_SEM_DEFINE(wifi_connected_sem, 0, 1);
+
+#define EVENT_MASK (NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED)
+
+static struct net_mgmt_event_callback mgmt_cb;
+static bool wifi_connected;
+
+static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
+				   struct net_if *iface)
+{
+	if ((mgmt_event & EVENT_MASK) != mgmt_event) {
+		return;
+	}
+	if (mgmt_event == NET_EVENT_L4_CONNECTED) {
+		LOG_INF("Network connected");
+		wifi_connected = true;
+		dk_set_led_on(DK_LED1);
+		return;
+	}
+	if (mgmt_event == NET_EVENT_L4_DISCONNECTED) {
+		if (wifi_connected == false) {
+			LOG_INF("Waiting for network to be connected");
+		} else {
+			dk_set_led_off(DK_LED1);
+			LOG_INF("Network disconnected");
+			wifi_connected = false;
+		}
+		return;
+	}
+}
 
 #define ADV_DATA_UPDATE_INTERVAL      5
 
@@ -208,6 +236,9 @@ int main(void)
 
 	/* Sleep 1 seconds to allow initialization of wifi driver. */
 	k_sleep(K_SECONDS(1));
+
+	net_mgmt_init_event_callback(&mgmt_cb, net_mgmt_event_handler, EVENT_MASK);
+	net_mgmt_add_event_callback(&mgmt_cb);
 
 	bt_conn_auth_cb_register(&auth_cb_display);
 	bt_conn_auth_info_cb_register(&auth_info_cb_display);
