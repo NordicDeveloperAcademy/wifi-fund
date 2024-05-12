@@ -28,7 +28,7 @@ LOG_MODULE_REGISTER(Lesson3_Exercise1, LOG_LEVEL_INF);
 #define EVENT_MASK (NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED)
 
 /* STEP 3 - Define the hostname and port for the echo server */
-#define SERVER_HOSTNAME "nordicecho.westeurope.cloudapp.azure.com"
+#define SERVER_HOSTNAME "udp-echo.nordicsemi.academy"
 #define SERVER_PORT	"2444"
 
 #define MESSAGE_SIZE	256
