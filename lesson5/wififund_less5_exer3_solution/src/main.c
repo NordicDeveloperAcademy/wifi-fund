@@ -163,7 +163,9 @@ static void handle_http_request(struct http_req *request)
 		 */
 		if ((ret == 1) && (led_id > 0) && (led_id < (ARRAY_SIZE(led_states) + 1))) {
 			if (handle_led_update(request, led_id)) {
-				resp_ptr = response_200;
+				(void)snprintk(dynamic_response_buf, sizeof(dynamic_response_buf),
+						"%s\r\n", response_200);
+				resp_ptr = dynamic_response_buf;
 			}
 		} else {
 			LOG_INF("Attempt to update unsupported resource '%s'", url);
