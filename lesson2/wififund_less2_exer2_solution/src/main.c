@@ -79,8 +79,9 @@ static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb,
 	//params->mfp = WIFI_MFP_OPTIONAL;
 	//params->timeout = SYS_FOREVER_MS;
 	//params->band = WIFI_FREQ_BAND_UNKNOWN;
+	//#if NCS_VERSION_NUMBER > 0x20600
 	//memset(params->bssid, 0, sizeof(params->bssid));
-
+	//#endif
 	//return 0;
 //}
 
