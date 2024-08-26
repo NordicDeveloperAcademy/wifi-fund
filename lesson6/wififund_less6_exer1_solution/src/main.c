@@ -51,8 +51,8 @@ bool http_put = 1;
 /* STEP 5.1 - Create a variables to keep track of the power save wakeup mode. */
 bool nrf_wifi_ps_wakeup_mode = 0;
 
-static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
-				   struct net_if *iface)
+static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb,
+			  uint32_t mgmt_event, struct net_if *iface)
 {
 	if ((mgmt_event & EVENT_MASK) != mgmt_event) {
 		return;
@@ -81,7 +81,10 @@ static int server_resolve(void)
 {
 	int err;
 	struct addrinfo *result;
-	struct addrinfo hints = {.ai_family = AF_INET, .ai_socktype = SOCK_STREAM};
+	struct addrinfo hints = {
+		.ai_family = AF_INET,
+		.ai_socktype = SOCK_STREAM
+	};
 
 	err = getaddrinfo(HTTP_HOSTNAME, STRINGIFY(HTTP_PORT), &hints, &result);
 	if (err != 0) {
@@ -126,7 +129,9 @@ static int server_connect(void)
 	return 0;
 }
 
-static void response_cb(struct http_response *rsp, enum http_final_call final_data, void *user_data)
+static void response_cb(struct http_response *rsp,
+                        enum http_final_call final_data,
+                        void *user_data)
 {
 	LOG_INF("Response status: %s", rsp->http_status);
 
@@ -138,8 +143,9 @@ static void response_cb(struct http_response *rsp, enum http_final_call final_da
 	}
 }
 
-static void client_id_cb(struct http_response *rsp, enum http_final_call final_data,
-			 void *user_data)
+static void client_id_cb(struct http_response *rsp,
+                        enum http_final_call final_data,
+                        void *user_data)
 {
 	LOG_INF("Response status: %s", rsp->http_status);
 
