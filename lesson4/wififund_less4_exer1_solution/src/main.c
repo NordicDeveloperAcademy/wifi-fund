@@ -232,9 +232,9 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 						   sizeof(CONFIG_LED2_OFF_CMD) - 1) == 0) {
 					dk_set_led_off(DK_LED2);
 				}
-
-				/* STEP 5.3 - On failed extraction of data, examine error code */
-			} else if (err == -EMSGSIZE) {
+			}
+			/* STEP 5.3 - On failed extraction of data, examine error code */
+			else if (err == -EMSGSIZE) {
 				LOG_ERR("Received payload (%d bytes) is larger than the payload "
 					"buffer size (%d bytes).",
 					p->message.payload.len, sizeof(payload_buf));

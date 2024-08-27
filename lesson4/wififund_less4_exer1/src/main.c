@@ -173,7 +173,8 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 			 * LED accordingly */
 
 			/* STEP 5.3 - On failed extraction of data, examine error code */
-
+			
+		}
 		break;
 	case MQTT_EVT_PUBACK:
 		if (evt->result != 0) {
