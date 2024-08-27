@@ -127,7 +127,7 @@ static bool handle_led_update(struct http_req *request, size_t led_id)
 	if (new_state <= 1) {
 		led_states[led_index] = new_state;
 	} else {
-		LOG_WRN("The LED%d state was attempted updated to illegal value %d", led_id,
+		LOG_WRN("Attempted to update LED%d state to illegal value %d", led_id,
 			new_state);
 		return false;
 	}
