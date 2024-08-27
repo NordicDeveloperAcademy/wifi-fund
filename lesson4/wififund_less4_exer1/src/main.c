@@ -155,13 +155,7 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 	switch (evt->type) {
 	case MQTT_EVT_CONNACK:
 		/* STEP 4 - Upon a successful connection, subscribe to topics */
-		if (evt->result != 0) {
-			LOG_ERR("MQTT connect failed: %d", evt->result);
-			break;
-		}
-		LOG_INF("MQTT client connected");
-		subscribe(c);
-		break;
+		
 	case MQTT_EVT_DISCONNECT:
 		LOG_INF("MQTT client disconnected: %d", evt->result);
 		break;
