@@ -21,11 +21,16 @@
 #include <net/wifi_credentials.h>
 #include <zephyr/net/socket.h>
 
+#if NCS_VERSION_NUMBER < 0x20600
+#include <zephyr/random/rand32.h>
+#else 
+#include <zephyr/random/random.h>
+#endif
+
 /* STEP 1.3 - Include the header file for the MQTT library */
 #include <zephyr/net/mqtt.h>
 
-/* STEP 1.4 - Include the header file for generating random numbers */
-#include <zephyr/random/rand32.h>
+
 
 LOG_MODULE_REGISTER(Lesson4_Exercise1, LOG_LEVEL_INF);
 
