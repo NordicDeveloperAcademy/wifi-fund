@@ -26,7 +26,7 @@ LOG_MODULE_REGISTER(Lesson6_Exercise1, LOG_LEVEL_INF);
 
 #define EVENT_MASK (NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED)
 
-#define HTTP_HOSTNAME "d1jglomgqgmujc.cloudfront.net"
+#define HTTP_HOSTNAME "echo.thingy.rocks"
 #define HTTP_PORT     80
 
 #define RECV_BUF_SIZE  2048
