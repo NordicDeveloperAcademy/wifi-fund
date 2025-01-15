@@ -99,7 +99,7 @@ static void udp_upload_results_cb(enum zperf_status status, struct zperf_results
 		}
 		/* STEP 7.3 - Print the results of the throughput test */
 		LOG_INF("Upload results:");
-		LOG_INF("%u bytes in %u ms", (result->nb_packets_sent * result->packet_size),
+		LOG_INF("%u bytes in %llu ms", (result->nb_packets_sent * result->packet_size),
 			(result->client_time_in_us / USEC_PER_MSEC));
 		LOG_INF("%u packets sent", result->nb_packets_sent);
 		LOG_INF("%u packets lost", result->nb_packets_lost);
@@ -109,6 +109,8 @@ static void udp_upload_results_cb(enum zperf_status status, struct zperf_results
 	case ZPERF_SESSION_ERROR:
 		/* STEP 7.4 - Inform the user that there is an error with the UDP session */
 		LOG_ERR("UDP session error");
+		break;
+	case ZPERF_SESSION_PERIODIC_RESULT:
 		break;
 	}
 }
