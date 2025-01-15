@@ -11,11 +11,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/types.h>
 #include <zephyr/logging/log.h>
-#if NCS_VERSION_NUMBER < 0x20600
-#include <zephyr/random/rand32.h>
-#else 
 #include <zephyr/random/random.h>
-#endif
 
 #include <dk_buttons_and_leds.h>
 
