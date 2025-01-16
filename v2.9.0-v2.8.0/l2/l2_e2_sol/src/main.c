@@ -20,7 +20,7 @@
 #include <zephyr/net/net_mgmt.h>
 #include <net/wifi_mgmt_ext.h>
 
-/* STEP 12.4 - Include the header file for the Wi-FI credentials library */
+/* STEP 13.4 - Include the header file for the Wi-FI credentials library */
 #include <net/wifi_credentials.h>
 
 LOG_MODULE_REGISTER(Lesson2_Exercise2, LOG_LEVEL_INF);
