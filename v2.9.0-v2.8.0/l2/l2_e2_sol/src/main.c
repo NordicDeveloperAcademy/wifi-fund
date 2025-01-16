@@ -67,22 +67,20 @@ static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb,
 //{
 
 	/* STEP 7.1 Populate the SSID and password */
-	//params->ssid = CONFIG_WIFI_CREDENTIALS_STATIC_SSID;
-	//params->ssid_length = strlen(params->ssid);
+//	params->ssid = CONFIG_WIFI_CREDENTIALS_STATIC_SSID;
+//	params->ssid_length = strlen(params->ssid);
 
-	//params->psk = CONFIG_WIFI_CREDENTIALS_STATIC_PASSWORD;
-	//params->psk_length = strlen(params->psk);
+//	params->psk = CONFIG_WIFI_CREDENTIALS_STATIC_PASSWORD;
+//	params->psk_length = strlen(params->psk);
 
 	/* STEP 7.2 - Populate the rest of the relevant members */
-	//params->channel = WIFI_CHANNEL_ANY;
-	//params->security = WIFI_SECURITY_TYPE_PSK;
-	//params->mfp = WIFI_MFP_OPTIONAL;
-	//params->timeout = SYS_FOREVER_MS;
-	//params->band = WIFI_FREQ_BAND_UNKNOWN;
-	//#if NCS_VERSION_NUMBER > 0x20600
-	//memset(params->bssid, 0, sizeof(params->bssid));
-	//#endif
-	//return 0;
+//	params->channel = WIFI_CHANNEL_ANY;
+//	params->security = WIFI_SECURITY_TYPE_PSK;
+//	params->mfp = WIFI_MFP_OPTIONAL;
+//	params->timeout = SYS_FOREVER_MS;
+//	params->band = WIFI_FREQ_BAND_UNKNOWN;
+//	memset(params->bssid, 0, sizeof(params->bssid));
+//	return 0;
 //}
 
 int main(void)
