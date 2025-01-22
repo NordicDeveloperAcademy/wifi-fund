@@ -7,8 +7,9 @@ Upon completion of the course, participants will have a thorough understanding o
 
 This repository contains the exercise code base and solutions. Make sure to select the directory that corresponds with the nRF Connect SDK version of your choosing:
 
-v2.9.0-v2.8.0: For nRF Connect SDK versions v2.8.0 to v2.9.0
-v2.7.0-v2.5.0: For nRF Connect SDK versions v2.5.0 to v2.7.0
+ - <code>v2.9.0-v2.8.0</code>: For nRF Connect SDK versions v2.9.0 to v2.8.0
+ - <code>v2.7.0-v2.6.1</code>: For nRF Connect SDK versions v2.7.0 to v2.6.1
+ - <code>v2.6.0-v2.5.0</code>: For nRF Connect SDK versions v2.6.0 to v2.5.0
 
 The course supports the following hardware:
  - [nRF7002 DK](https://www.nordicsemi.com/Products/Development-hardware/nRF7002-DK) (stand-alone)
