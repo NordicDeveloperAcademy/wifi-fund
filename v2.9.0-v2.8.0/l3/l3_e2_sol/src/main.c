@@ -109,6 +109,7 @@ static void udp_upload_results_cb(enum zperf_status status, struct zperf_results
 	case ZPERF_SESSION_ERROR:
 		/* STEP 7.4 - Inform the user that there is an error with the UDP session */
 		LOG_ERR("UDP session error");
+		LOG_INF("%u packet errors", result->nb_packets_errors);
 		break;
 	case ZPERF_SESSION_PERIODIC_RESULT:
 		break;
