@@ -41,8 +41,8 @@ static struct net_mgmt_event_callback mgmt_cb;
 static bool connected;
 static K_SEM_DEFINE(run_app, 0, 1);
 
-static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb,
-			  uint32_t mgmt_event, struct net_if *iface)
+static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
+				   struct net_if *iface)
 {
 	if ((mgmt_event & EVENT_MASK) != mgmt_event) {
 		return;
@@ -81,7 +81,8 @@ static void udp_upload_results_cb(enum zperf_status status,
 		break;
 	case ZPERF_SESSION_FINISHED:
 		LOG_INF("Wi-Fi throughput test: Upload completed!");
-		/* STEP 7.2 - If client_time_in_us is not zero, calculate the throughput rate in kilobit per second. Otherwise, set it to zero */
+				/* STEP 7.2 - If client_time_in_us is not zero, calculate the throughput rate in
+		 * kilobit per second. Otherwise, set it to zero */
 
 		/* STEP 7.3 - Print the results of the throughput test */
 
@@ -89,6 +90,8 @@ static void udp_upload_results_cb(enum zperf_status status,
 	case ZPERF_SESSION_ERROR:
 		/* STEP 7.4 - Inform the user that there is an error with the UDP session */
 
+		break;
+	case ZPERF_SESSION_PERIODIC_RESULT:
 		break;
 	}
 }
@@ -102,16 +105,17 @@ int main(void)
 	nrfx_clock_divider_set(NRF_CLOCK_DOMAIN_HFCLK, NRF_CLOCK_HFCLK_DIV_1);
 	#endif
 
-	LOG_INF("Starting %s with CPU frequency: %d MHz", CONFIG_BOARD, SystemCoreClock/MHZ(1));
+	LOG_INF("Starting %s with CPU frequency: %d MHz", CONFIG_BOARD, SystemCoreClock / MHZ(1));
 	
 	k_sleep(K_SECONDS(1));
-	
-	
+
 	net_mgmt_init_event_callback(&mgmt_cb, net_mgmt_event_handler, EVENT_MASK);
 	net_mgmt_add_event_callback(&mgmt_cb);
 
 	LOG_INF("Waiting to connect to Wi-Fi");
 	k_sem_take(&run_app, K_FOREVER);
+
+	k_sleep(K_SECONDS(3));
 
 	/* STEP 5.1 - Initialize a struct for storing the zperf upload parameters */
 

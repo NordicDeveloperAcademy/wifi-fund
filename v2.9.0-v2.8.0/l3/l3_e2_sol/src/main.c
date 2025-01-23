@@ -73,8 +73,9 @@ static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint32_t 
 	}
 }
 
-static void udp_upload_results_cb(enum zperf_status status, struct zperf_results *result,
-				  void *user_data)
+static void udp_upload_results_cb(enum zperf_status status,
+			  struct zperf_results *result,
+			  void *user_data)
 {
 	unsigned int client_rate_in_kbps;
 
@@ -120,13 +121,13 @@ int main(void)
 {
 	int ret;
 
-/* Configures the clock domain divider for the HF clock */
-#ifdef CLOCK_FEATURE_HFCLK_DIVIDE_PRESENT
+	/* Configures the clock domain divider for the HF clock */
+	#ifdef CLOCK_FEATURE_HFCLK_DIVIDE_PRESENT
 	nrfx_clock_divider_set(NRF_CLOCK_DOMAIN_HFCLK, NRF_CLOCK_HFCLK_DIV_1);
-#endif
+	#endif
 
 	LOG_INF("Starting %s with CPU frequency: %d MHz", CONFIG_BOARD, SystemCoreClock / MHZ(1));
-
+	
 	k_sleep(K_SECONDS(1));
 
 	net_mgmt_init_event_callback(&mgmt_cb, net_mgmt_event_handler, EVENT_MASK);
@@ -134,6 +135,8 @@ int main(void)
 
 	LOG_INF("Waiting to connect to Wi-Fi");
 	k_sem_take(&run_app, K_FOREVER);
+
+	k_sleep(K_SECONDS(3));
 
 	/* STEP 5.1 - Initialize a struct for storing the zperf upload parameters */
 	struct zperf_upload_params params;
