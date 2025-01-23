@@ -28,7 +28,6 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <bluetooth/services/wifi_provisioning.h>
 
-
 LOG_MODULE_REGISTER(Lesson2_Exercise3, LOG_LEVEL_INF);
 
 #define EVENT_MASK (NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED)
@@ -286,9 +285,11 @@ static void update_dev_name(struct net_linkaddr *mac_addr)
 int main(void)
 {
 	int err;
-
-	/* Sleep 1 seconds to allow initialization of wifi driver. */
-	k_sleep(K_SECONDS(1));
+	err = dk_leds_init();
+	if (err) {
+		LOG_ERR("LEDs init failed (err %d)", err);
+		return err;
+	}
 
 	net_mgmt_init_event_callback(&mgmt_cb, net_mgmt_event_handler, EVENT_MASK);
 	net_mgmt_add_event_callback(&mgmt_cb);
