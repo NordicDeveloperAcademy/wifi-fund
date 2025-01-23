@@ -70,7 +70,7 @@ static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint32_t 
 						BT_GAP_ADV_SLOW_INT_MAX, NULL)
 
 #define ADV_DAEMON_STACK_SIZE 4096
-#define ADV_DAEMON_PRIORITY 5
+#define ADV_DAEMON_PRIORITY   5
 
 K_THREAD_STACK_DEFINE(adv_daemon_stack_area, ADV_DAEMON_STACK_SIZE);
 static struct k_work_q adv_daemon_work_q;
@@ -153,8 +153,7 @@ static void security_changed(struct bt_conn *conn, bt_security_t level,
 	if (!err) {
 		LOG_INF("BT Security changed: %s level %u.\n", addr, level);
 	} else {
-		LOG_ERR("BT Security failed: %s level %u err %d.\n", addr, level,
-			   err);
+		LOG_ERR("BT Security failed: %s level %u err %d.\n", addr, level, err);
 	}
 }
 
@@ -199,7 +198,7 @@ static struct bt_conn_auth_info_cb auth_info_cb_display = {
 };
 
 static void update_adv_data_task(struct k_work *item)
-{	
+{
 	/* STEP 7.2 - Update the advertising and scan response data*/
 
 }
@@ -233,6 +232,10 @@ static void update_dev_name(struct net_linkaddr *mac_addr)
 int main(void)
 {
 	int err;
+	
+	if (dk_leds_init() != 0) {
+		LOG_ERR("Failed to initialize the LED library");
+	}
 
 	/* Sleep 1 seconds to allow initialization of wifi driver. */
 	k_sleep(K_SECONDS(1));

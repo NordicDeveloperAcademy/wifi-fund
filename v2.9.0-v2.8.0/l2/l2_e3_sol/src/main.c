@@ -59,9 +59,9 @@ static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint32_t 
 	}
 }
 
-#define ADV_DATA_UPDATE_INTERVAL 5
+#define ADV_DATA_UPDATE_INTERVAL      5
 
-#define ADV_PARAM_UPDATE_DELAY 1
+#define ADV_PARAM_UPDATE_DELAY        1
 
 /* STEP 3.2 - Define indexes for accessing prov_svc_data */
 #define ADV_DATA_VERSION_IDX	      (BT_UUID_SIZE_128 + 0)
@@ -70,13 +70,13 @@ static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint32_t 
 #define ADV_DATA_FLAG_CONN_STATUS_BIT BIT(1)
 #define ADV_DATA_RSSI_IDX	      (BT_UUID_SIZE_128 + 3)
 
-#define PROV_BT_LE_ADV_PARAM_FAST                                                                  \
-	BT_LE_ADV_PARAM(BT_LE_ADV_OPT_CONNECTABLE, BT_GAP_ADV_FAST_INT_MIN_2,                      \
-			BT_GAP_ADV_FAST_INT_MAX_2, NULL)
+#define PROV_BT_LE_ADV_PARAM_FAST BT_LE_ADV_PARAM(BT_LE_ADV_OPT_CONNECTABLE, \
+						BT_GAP_ADV_FAST_INT_MIN_2, \
+						BT_GAP_ADV_FAST_INT_MAX_2, NULL)
 
-#define PROV_BT_LE_ADV_PARAM_SLOW                                                                  \
-	BT_LE_ADV_PARAM(BT_LE_ADV_OPT_CONNECTABLE, BT_GAP_ADV_SLOW_INT_MIN,                        \
-			BT_GAP_ADV_SLOW_INT_MAX, NULL)
+#define PROV_BT_LE_ADV_PARAM_SLOW BT_LE_ADV_PARAM(BT_LE_ADV_OPT_CONNECTABLE, \
+						BT_GAP_ADV_SLOW_INT_MIN, \
+						BT_GAP_ADV_SLOW_INT_MAX, NULL)
 
 #define ADV_DAEMON_STACK_SIZE 4096
 #define ADV_DAEMON_PRIORITY   5
@@ -164,7 +164,7 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 }
 
 static void identity_resolved(struct bt_conn *conn, const bt_addr_le_t *rpa,
-			      const bt_addr_le_t *identity)
+				const bt_addr_le_t *identity)
 {
 	char addr_identity[BT_ADDR_LE_STR_LEN];
 	char addr_rpa[BT_ADDR_LE_STR_LEN];
@@ -175,7 +175,8 @@ static void identity_resolved(struct bt_conn *conn, const bt_addr_le_t *rpa,
 	LOG_INF("BT Identity resolved %s -> %s.\n", addr_rpa, addr_identity);
 }
 
-static void security_changed(struct bt_conn *conn, bt_security_t level, enum bt_security_err err)
+static void security_changed(struct bt_conn *conn, bt_security_t level,
+				enum bt_security_err err)
 {
 	char addr[BT_ADDR_LE_STR_LEN];
 
@@ -268,9 +269,9 @@ static void byte_to_hex(char *ptr, uint8_t byte, char base)
 
 	for (i = 0, val = (byte & 0xf0) >> 4; i < 2; i++, val = byte & 0x0f) {
 		if (val < 10) {
-			*ptr++ = (char)(val + '0');
+			*ptr++ = (char) (val + '0');
 		} else {
-			*ptr++ = (char)(val - 10 + base);
+			*ptr++ = (char) (val - 10 + base);
 		}
 	}
 }
@@ -285,11 +286,13 @@ static void update_dev_name(struct net_linkaddr *mac_addr)
 int main(void)
 {
 	int err;
-	err = dk_leds_init();
-	if (err) {
-		LOG_ERR("LEDs init failed (err %d)", err);
-		return err;
+	
+	if (dk_leds_init() != 0) {
+		LOG_ERR("Failed to initialize the LED library");
 	}
+
+	/* Sleep 1 seconds to allow initialization of wifi driver. */
+	k_sleep(K_SECONDS(1));
 
 	net_mgmt_init_event_callback(&mgmt_cb, net_mgmt_event_handler, EVENT_MASK);
 	net_mgmt_add_event_callback(&mgmt_cb);
@@ -340,7 +343,8 @@ int main(void)
 
 	k_work_queue_init(&adv_daemon_work_q);
 	k_work_queue_start(&adv_daemon_work_q, adv_daemon_stack_area,
-			   K_THREAD_STACK_SIZEOF(adv_daemon_stack_area), ADV_DAEMON_PRIORITY, NULL);
+			K_THREAD_STACK_SIZEOF(adv_daemon_stack_area), ADV_DAEMON_PRIORITY,
+			NULL);
 
 	/* STEP 11 - Initializa all work items to their respective task */
 	k_work_init_delayable(&update_adv_param_work, update_adv_param_task);
