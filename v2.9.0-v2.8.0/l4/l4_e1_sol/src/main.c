@@ -25,13 +25,9 @@
 /* STEP 1.3 - Include the header file for the MQTT library */
 #include <zephyr/net/mqtt.h>
 
-
-
 LOG_MODULE_REGISTER(Lesson4_Exercise1, LOG_LEVEL_INF);
 
 #define EVENT_MASK (NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED)
-
-
 #define CLIENT_ID_LEN  sizeof(CONFIG_BOARD) + 11
 
 static struct net_mgmt_event_callback mgmt_cb;

@@ -4,25 +4,22 @@
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 #
 
-menu "Wifi Fund Lesson 4 Exercise 1"
+menu "Wi-Fi Fund Lesson 4 Exercise 1"
 
 config MQTT_PUB_TOPIC
 	string "MQTT publish topic"
-	default "devacademy/publish/topic44"
 
 config MQTT_SUB_TOPIC
 	string "MQTT subscribe topic"
-	default "devacademy/subscribe/topic44"
 
 config MQTT_CLIENT_ID
 	string "MQTT Client ID"
 	help
 	  Use a custom Client ID string.
 
-
 config MQTT_BROKER_HOSTNAME
 	string "MQTT broker hostname"
-	default "test.mosquitto.org"
+	default "mqtt.nordicsemi.academy"
 
 config MQTT_BROKER_PORT
 	int "MQTT broker port"

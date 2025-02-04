@@ -19,12 +19,7 @@
 #include <net/wifi_mgmt_ext.h>
 #include <net/wifi_credentials.h>
 #include <zephyr/net/socket.h>
-
-#if NCS_VERSION_NUMBER < 0x20600
-#include <zephyr/random/rand32.h>
-#else 
 #include <zephyr/random/random.h>
-#endif
 
 /* STEP 1.3 - Include the header file for the MQTT library */
 
@@ -32,7 +27,6 @@
 LOG_MODULE_REGISTER(Lesson4_Exercise1, LOG_LEVEL_INF);
 
 #define EVENT_MASK (NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED)
-
 #define CLIENT_ID_LEN  sizeof(CONFIG_BOARD) + 11
 
 static struct net_mgmt_event_callback mgmt_cb;
