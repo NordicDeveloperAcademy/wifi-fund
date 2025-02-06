@@ -11,11 +11,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/types.h>
 #include <zephyr/logging/log.h>
-#if NCS_VERSION_NUMBER < 0x20600
-#include <zephyr/random/rand32.h>
-#else 
 #include <zephyr/random/random.h>
-#endif
 
 #include <dk_buttons_and_leds.h>
 
@@ -109,7 +105,7 @@ static int server_resolve(void)
 	inet_ntop(AF_INET, &server4->sin_addr.s_addr, ipv4_addr, 
 		sizeof(ipv4_addr));
 	LOG_INF("IPv4 address of MQTT broker found %s", ipv4_addr);
-	
+
 	freeaddrinfo(result);
 	return err;
 }
@@ -354,7 +350,7 @@ int main(void)
 	if (dk_leds_init() != 0) {
 		LOG_ERR("Failed to initialize the LED library");
 	}
-	
+
 	/* Sleep to allow initialization of Wi-Fi driver */
 	k_sleep(K_SECONDS(1));
 
@@ -367,7 +363,7 @@ int main(void)
 	if (dk_buttons_init(button_handler) != 0) {
 		LOG_ERR("Failed to initialize the buttons library");
 	}
-	
+
 	/* STEP 3.2 - Store the credential on the device */
 
 

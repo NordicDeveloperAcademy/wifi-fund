@@ -22,14 +22,19 @@
 #include <net/wifi_credentials.h>
 #include <zephyr/net/socket.h>
 #include <zephyr/net/mqtt.h>
+#include <net/mqtt_helper.h>
 
 /* STEP 1.6 - Include the header file for the TLS credentials library */
 #include <zephyr/net/tls_credentials.h>
 
 /* STEP 2.3 - Include the certificate */
-static const unsigned char ca_certificate[] = {
+/*static const unsigned char ca_certificate[] = {
 #include "certificate.h"
-};
+};*/
+
+/*static const unsigned char ca_certificate[] = {
+#include "certificate.h"
+};*/
 
 LOG_MODULE_REGISTER(Lesson4_Exercise2, LOG_LEVEL_INF);
 
@@ -51,7 +56,7 @@ static uint8_t payload_buf[CONFIG_MQTT_PAYLOAD_BUFFER_SIZE];
 
 static struct sockaddr_storage server;
 static struct mqtt_client client;
-static struct pollfd fds;
+//static struct pollfd fds;
 
 static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
 				   struct net_if *iface)
@@ -71,40 +76,11 @@ static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint32_t 
 		} else {
 			LOG_INF("Network disconnected");
 			connected = false;
+			(void)mqtt_helper_disconnect();
 		}
 		k_sem_reset(&run_app);
 		return;
 	}
-}
-
-static int server_resolve(void)
-{
-	int err;
-	struct addrinfo *result;
-	struct addrinfo hints = {.ai_family = AF_INET, .ai_socktype = SOCK_STREAM};
-
-	err = getaddrinfo(CONFIG_MQTT_BROKER_HOSTNAME, NULL, &hints, &result);
-	if (err) {
-		LOG_INF("getaddrinfo failed, err: %d, %s", err, gai_strerror(err));
-		return -ECHILD;
-	}
-
-	if (result == NULL) {
-		LOG_INF("Error, address not found");
-		return -ENOENT;
-	}
-
-	struct sockaddr_in *server4 = ((struct sockaddr_in *)&server);
-	server4->sin_addr.s_addr = ((struct sockaddr_in *)result->ai_addr)->sin_addr.s_addr;
-	server4->sin_family = AF_INET;
-	server4->sin_port = htons(CONFIG_MQTT_BROKER_PORT);
-
-	char ipv4_addr[NET_IPV4_ADDR_LEN];
-	inet_ntop(AF_INET, &server4->sin_addr.s_addr, ipv4_addr, sizeof(ipv4_addr));
-	LOG_INF("IPv4 address of MQTT broker found %s", ipv4_addr);
-
-	freeaddrinfo(result);
-	return err;
 }
 
 static int get_received_payload(struct mqtt_client *c, size_t length)
@@ -137,17 +113,27 @@ static int get_received_payload(struct mqtt_client *c, size_t length)
 	return err;
 }
 
-static int subscribe(struct mqtt_client *const c)
+static void subscribe(void)
 {
+	int err;
+
 	struct mqtt_topic subscribe_topic = {
 		.topic = {.utf8 = CONFIG_MQTT_SUB_TOPIC, .size = strlen(CONFIG_MQTT_SUB_TOPIC)},
 		.qos = MQTT_QOS_1_AT_LEAST_ONCE};
 
-	const struct mqtt_subscription_list subscription_list = {
-		.list = &subscribe_topic, .list_count = 1, .message_id = 1234};
+	struct mqtt_subscription_list subscription_list = {
+		.list = &subscribe_topic,
+		.list_count = 1,
+		.message_id = 1234
+	};
 
 	LOG_INF("Subscribing to %s", CONFIG_MQTT_SUB_TOPIC);
-	return mqtt_subscribe(c, &subscription_list);
+	err = mqtt_helper_subscribe(&subscription_list);
+	if (err) {
+		LOG_ERR("Failed to subscribe to topics, error: %d", err);
+		return;
+	}
+	//return mqtt_subscribe(c, &subscription_list);
 }
 
 static void data_print(uint8_t *prefix, uint8_t *data, size_t len)
@@ -159,8 +145,9 @@ static void data_print(uint8_t *prefix, uint8_t *data, size_t len)
 	LOG_INF("%s%s", (char *)prefix, (char *)buf);
 }
 
-int publish(struct mqtt_client *c, enum mqtt_qos qos, uint8_t *data, size_t len)
+static int publish(struct mqtt_client *c, enum mqtt_qos qos, uint8_t *data, size_t len)
 {
+	int err;
 	struct mqtt_publish_param param;
 
 	param.message.topic.qos = qos;
@@ -172,11 +159,65 @@ int publish(struct mqtt_client *c, enum mqtt_qos qos, uint8_t *data, size_t len)
 	param.dup_flag = 0;
 	param.retain_flag = 0;
 
-	data_print("Publishing: ", data, len);
-	LOG_INF("to topic: %s len: %u", CONFIG_MQTT_PUB_TOPIC,
-		(unsigned int)strlen(CONFIG_MQTT_PUB_TOPIC));
+	//data_print("Publishing: ", data, len);
+	//LOG_INF("to topic: %s len: %u", CONFIG_MQTT_PUB_TOPIC,
+		//(unsigned int)strlen(CONFIG_MQTT_PUB_TOPIC));
 
-	return mqtt_publish(c, &param);
+	err = mqtt_helper_publish(&param);
+	if (err) {
+		LOG_WRN("Failed to send payload, err: %d", err);
+		return err;
+	}
+
+	LOG_INF("Published message: \"%.*s\" on topic: \"%.*s\"", param.message.payload.len,
+								  param.message.payload.data,
+								  param.message.topic.topic.size,
+								  param.message.topic.topic.utf8);
+	return 0;
+}
+
+/* Callback handlers from MQTT helper library.
+ * The functions are called whenever specific MQTT packets are received from the broker, or
+ * some library state has changed.
+ */
+static void on_mqtt_connack(enum mqtt_conn_return_code return_code, bool session_present)
+{
+	ARG_UNUSED(return_code);
+}
+
+static void on_mqtt_disconnect(int result)
+{
+	ARG_UNUSED(result);
+}
+
+static void on_mqtt_publish(struct mqtt_helper_buf topic, struct mqtt_helper_buf payload)
+{
+	LOG_INF("Received payload: %.*s on topic: %.*s", payload.size,
+							 payload.ptr,
+							 topic.size,
+							 topic.ptr);
+}
+
+static void on_mqtt_suback(uint16_t message_id, int result)
+{
+	if ((message_id == 2469) && (result == 0)) {
+		LOG_INF("Subscribed to topic %s", CONFIG_MQTT_SUB_TOPIC);
+	} else if (result) {
+		LOG_ERR("Topic subscription failed, error: %d", result);
+	} else {
+		LOG_WRN("Subscribed to unknown topic, id: %d", message_id);
+	}
+}
+
+static void connected_entry(struct mqtt_client *c)
+{
+	LOG_INF("Connected to MQTT broker");
+	LOG_INF("Hostname: %s", CONFIG_MQTT_BROKER_HOSTNAME);
+	LOG_INF("Client ID: %s", c->client_id.utf8);
+	LOG_INF("Port: %d", CONFIG_MQTT_BROKER_PORT);
+	LOG_INF("TLS: %s", IS_ENABLED(CONFIG_MQTT_LIB_TLS) ? "Yes" : "No");
+
+	subscribe();
 }
 
 void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
@@ -191,7 +232,8 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 		}
 
 		LOG_INF("MQTT client connected");
-		subscribe(c);
+		connected_entry(c);
+		//subscribe(c);
 		break;
 
 	case MQTT_EVT_DISCONNECT:
@@ -284,11 +326,7 @@ int client_init(struct mqtt_client *client)
 	int err;
 	mqtt_client_init(client);
 
-	err = server_resolve();
-	if (err) {
-		LOG_ERR("Failed to initialize broker connection");
-		return err;
-	}
+
 
 	client->broker = &server;
 	client->evt_cb = mqtt_evt_handler;
@@ -316,7 +354,7 @@ int client_init(struct mqtt_client *client)
 	tls_cfg->session_cache = TLS_SESSION_CACHE_DISABLED;
 	tls_cfg->hostname = CONFIG_MQTT_BROKER_HOSTNAME;
 
-	return err;
+	return 0;
 }
 
 static void button_handler(uint32_t button_state, uint32_t has_changed)
@@ -341,6 +379,23 @@ static void button_handler(uint32_t button_state, uint32_t has_changed)
 int main(void)
 {
 	int err;
+	char * client_id = client_id_get();
+
+	struct mqtt_helper_cfg config = {
+		.cb = {
+			.on_connack = on_mqtt_connack,
+			.on_disconnect = on_mqtt_disconnect,
+			.on_publish = on_mqtt_publish,
+			.on_suback = on_mqtt_suback,
+		},
+	};
+
+	struct mqtt_helper_conn_params conn_params = {
+		.hostname.ptr = CONFIG_MQTT_BROKER_HOSTNAME,
+		.hostname.size = strlen(CONFIG_MQTT_BROKER_HOSTNAME),
+		.device_id.ptr = client_id,
+		.device_id.size = strlen(client_id),
+	};
 
 	if (dk_leds_init() != 0) {
 		LOG_ERR("Failed to initialize the LED library");
@@ -359,34 +414,26 @@ int main(void)
 		LOG_ERR("Failed to initialize the buttons library");
 	}
 
-	/* STEP 3.2 - Store the credential on the device */
-	err = tls_credential_add(MQTT_TLS_SEC_TAG, TLS_CREDENTIAL_CA_CERTIFICATE, ca_certificate,
-				 sizeof(ca_certificate));
-	if (err < 0) {
-		LOG_ERR("Failed to add TLS credentials, err: %d", err);
-		return err;
+	err = mqtt_helper_init(&config);
+	if (err) {
+		LOG_ERR("mqtt_helper_init, error: %d", err);
+		return 0;
 	}
 
 	LOG_INF("Connecting to MQTT broker");
 
-	err = client_init(&client);
+	err = mqtt_helper_connect(&conn_params);
 	if (err) {
-		LOG_ERR("Failed to initialize MQTT client: %d", err);
-		return err;
-	}
-
-	err = mqtt_connect(&client);
-	if (err) {
-		LOG_ERR("Error in mqtt_connect: %d", err);
-		return err;
+		LOG_ERR("Failed connecting to MQTT, error code: %d", err);
+		return 0;
 	}
 
 	/* STEP 5 - Update the file descriptor to use the TLS socket */
-	fds.fd = client.transport.tls.sock;
-	fds.events = POLLIN;
+	/*fds.fd = client.transport.tls.sock;
+	fds.events = POLLIN;*/
 
-	while (1) {
-		err = poll(&fds, 1, mqtt_keepalive_time_left(&client));
+	//while (1) {
+		/*err = poll(&fds, 1, mqtt_keepalive_time_left(&client));
 		if (err < 0) {
 			LOG_ERR("Error in poll(): %d", errno);
 			break;
@@ -411,13 +458,13 @@ int main(void)
 		if ((fds.revents & POLLNVAL) == POLLNVAL) {
 			LOG_ERR("POLLNVAL");
 			break;
-		}
-	}
-
-	LOG_INF("Disconnecting MQTT client");
+		}*/
+	//}
+	//return 0;
+	/*LOG_INF("Disconnecting MQTT client");
 	err = mqtt_disconnect(&client);
 	if (err) {
 		LOG_ERR("Could not disconnect MQTT client: %d", err);
 		return err;
-	}
+	}*/
 }
