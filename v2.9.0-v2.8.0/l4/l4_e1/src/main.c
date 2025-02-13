@@ -10,6 +10,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/types.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/random/random.h>
 
 #include <dk_buttons_and_leds.h>
 
@@ -19,27 +20,27 @@
 #include <net/wifi_mgmt_ext.h>
 #include <net/wifi_credentials.h>
 #include <zephyr/net/socket.h>
-#include <zephyr/random/random.h>
 
 /* STEP 1.3 - Include the header file for the MQTT library */
+
+/* STEP 1.x - Include the header file for the MQTT helper library */
 
 
 LOG_MODULE_REGISTER(Lesson4_Exercise1, LOG_LEVEL_INF);
 
 #define EVENT_MASK (NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED)
+
 #define CLIENT_ID_LEN  sizeof(CONFIG_BOARD) + 11
+#define MESSAGE_BUFFER_SIZE 128
+
+/* STEP 2 - Define the commands to control and monitor LEDs and buttons */
+
+/* STEP 3 - 3. Define the message ID used when subscribing to topics */
 
 static struct net_mgmt_event_callback mgmt_cb;
 static bool connected;
 static K_SEM_DEFINE(run_app, 0, 1);
 
-static uint8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
-static uint8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
-static uint8_t payload_buf[CONFIG_MQTT_PAYLOAD_BUFFER_SIZE];
-
-static struct sockaddr_storage server;
-static struct mqtt_client client;
-static struct pollfd fds;
 
 static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
 				   struct net_if *iface)
@@ -59,88 +60,24 @@ static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint32_t 
 		} else {
 			LOG_INF("Network disconnected");
 			connected = false;
+			/* STEP 5 - Disconnect from MQTT broker if disconnected from network */
 		}
 		k_sem_reset(&run_app);
 		return;
 	}
 }
 
-static int server_resolve(void)
+/* STEP 6 - Define the function to subscribe to topics */
+static void subscribe(void)
 {
 	int err;
-	struct addrinfo *result;
-	struct addrinfo hints = {.ai_family = AF_INET, .ai_socktype = SOCK_STREAM};
 
-	err = getaddrinfo(CONFIG_MQTT_BROKER_HOSTNAME, NULL, &hints, &result);
-	if (err) {
-		LOG_INF("getaddrinfo failed, err: %d, %s", err, gai_strerror(err));
-		return -ECHILD;
-	}
+	/* STEP 6.1 - Declare a variable of type mqtt_topic */
 
-	if (result == NULL) {
-		LOG_INF("Error, address not found");
-		return -ENOENT;
-	}
+	/* STEP 6.2 - Define a subscription list */
 
-	struct sockaddr_in *server4 = ((struct sockaddr_in *)&server);
-	server4->sin_addr.s_addr = ((struct sockaddr_in *)result->ai_addr)->sin_addr.s_addr;
-	server4->sin_family = AF_INET;
-	server4->sin_port = htons(CONFIG_MQTT_BROKER_PORT);
+	/* STEP 6.3 - Subscribe to topics */
 
-	char ipv4_addr[NET_IPV4_ADDR_LEN];
-	inet_ntop(AF_INET, &server4->sin_addr.s_addr, ipv4_addr, sizeof(ipv4_addr));
-	LOG_INF("IPv4 address of MQTT broker found %s", ipv4_addr);
-
-	freeaddrinfo(result);
-	return err;
-}
-
-static int get_received_payload(struct mqtt_client *c, size_t length)
-{
-	int ret;
-	int err = 0;
-
-	if (length > sizeof(payload_buf)) {
-		err = -EMSGSIZE;
-	}
-
-	/* Truncate payload until it fits in the payload buffer. */
-	while (length > sizeof(payload_buf)) {
-		ret = mqtt_read_publish_payload_blocking(c, payload_buf,
-							 (length - sizeof(payload_buf)));
-		if (ret == 0) {
-			return -EIO;
-		} else if (ret < 0) {
-			return ret;
-		}
-
-		length -= ret;
-	}
-
-	ret = mqtt_readall_publish_payload(c, payload_buf, length);
-	if (ret) {
-		return ret;
-	}
-
-	return err;
-}
-
-static int subscribe(struct mqtt_client *const c)
-{
-	/* STEP 3.1 - Declare a variable of type mqtt_topic */
-
-	/* STEP 3.2 - Define a subscription list */
-
-	/* STEP 3.3 - Subscribe to the topics */
-}
-
-static void data_print(uint8_t *prefix, uint8_t *data, size_t len)
-{
-	char buf[len + 1];
-
-	memcpy(buf, data, len);
-	buf[len] = 0;
-	LOG_INF("%s%s", (char *)prefix, (char *)buf);
 }
 
 /* STEP 6 - Define the function to publish data */
