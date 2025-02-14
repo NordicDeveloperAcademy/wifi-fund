@@ -21,9 +21,6 @@
 #include <net/wifi_credentials.h>
 #include <zephyr/net/socket.h>
 
-/* STEP 1.3 - Include the header file for the MQTT library */
-//#include <zephyr/net/mqtt.h>
-
 /* STEP 1.3 - Include the header file for the MQTT helper library */
 #include <net/mqtt_helper.h>
 
@@ -47,6 +44,9 @@ LOG_MODULE_REGISTER(Lesson4_Exercise1, LOG_LEVEL_INF);
 static struct net_mgmt_event_callback mgmt_cb;
 static bool connected;
 static K_SEM_DEFINE(run_app, 0, 1);
+
+/* STEP 10.1 - Declare the variable to store the client ID */
+static uint8_t client_id[sizeof(CONFIG_BOARD) + 11];
 
 
 static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
@@ -139,7 +139,7 @@ static void on_mqtt_connack(enum mqtt_conn_return_code return_code, bool session
 	if (return_code == MQTT_CONNECTION_ACCEPTED) {
 		LOG_INF("Connected to MQTT broker");
 		LOG_INF("Hostname: %s", CONFIG_MQTT_SAMPLE_BROKER_HOSTNAME);
-		LOG_INF("Client ID: %s", client_id);
+		LOG_INF("Client ID: %s", (char *)client_id);
 		LOG_INF("Port: %d", CONFIG_MQTT_HELPER_PORT);
 		LOG_INF("TLS: %s", IS_ENABLED(CONFIG_MQTT_LIB_TLS) ? "Yes" : "No");
 		subscribe();
@@ -152,14 +152,16 @@ static void on_mqtt_connack(enum mqtt_conn_return_code return_code, bool session
 
 /* STEP 8.2 - Define callback handler for SUBACK event */
 static void on_mqtt_suback(uint16_t message_id, int result)
-{
-	if ((message_id == SUBSCRIBE_TOPIC_ID) && (result == 0)) {
-		LOG_INF("Subscribed to topic %s", CONFIG_MQTT_SAMPLE_SUB_TOPIC);
-	} else if (result) {
-		LOG_ERR("Topic subscription failed, error: %d", result);
-	} else {
-		LOG_WRN("Subscribed to unknown topic, id: %d", message_id);
+{	
+	if (result != MQTT_SUBACK_FAILURE) {
+		if (message_id == SUBSCRIBE_TOPIC_ID) {
+			LOG_INF("Subscribed to %s with QoS %d", CONFIG_MQTT_SAMPLE_SUB_TOPIC, result);
+			return;
+		}
+		LOG_WRN("Subscribed to unknown topic, id: %d with QoS %d", message_id, result);
+		return;
 	}
+	LOG_ERR("Topic subscription failed, error: %d", result);
 }
 
 /* STEP 8.3 - Define callback handler for PUBLISH event */
@@ -231,7 +233,7 @@ int main(void)
 		LOG_ERR("Failed to initialize the buttons library");
 	}
 
-	/* STEP 10 - Initialize the MQTT helper library */
+	/* STEP 9 - Initialize the MQTT helper library */
 	struct mqtt_helper_cfg config = {
 		.cb = {
 			.on_connack = on_mqtt_connack,
@@ -247,16 +249,15 @@ int main(void)
 		return 0;
 	}
 
-	/* STEP 11.1 - Generate the client ID */
-	uint8_t client_id[sizeof(CONFIG_BOARD) + 11];
+	/* STEP 10.2 - Generate the client ID */
 	uint32_t id = sys_rand32_get();
 	snprintf(client_id, sizeof(client_id), "%s-%010u", CONFIG_BOARD, id);
 
-	/* STEP 11.2 - Establish a connection the MQTT broker */
+	/* STEP 11 - Establish a connection the MQTT broker */
 	struct mqtt_helper_conn_params conn_params = {
 		.hostname.ptr = CONFIG_MQTT_SAMPLE_BROKER_HOSTNAME,
 		.hostname.size = strlen(CONFIG_MQTT_SAMPLE_BROKER_HOSTNAME),
-		.device_id.ptr = client_id,
+		.device_id.ptr = (char *)client_id,
 		.device_id.size = strlen(client_id),
 	};
 

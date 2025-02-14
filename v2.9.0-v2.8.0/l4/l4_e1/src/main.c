@@ -21,25 +21,24 @@
 #include <net/wifi_credentials.h>
 #include <zephyr/net/socket.h>
 
-/* STEP 1.3 - Include the header file for the MQTT library */
-
-/* STEP 1.x - Include the header file for the MQTT helper library */
+/* STEP 1.3 - Include the header file for the MQTT helper library */
 
 
 LOG_MODULE_REGISTER(Lesson4_Exercise1, LOG_LEVEL_INF);
 
 #define EVENT_MASK (NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED)
 
-#define CLIENT_ID_LEN  sizeof(CONFIG_BOARD) + 11
 #define MESSAGE_BUFFER_SIZE 128
 
 /* STEP 2 - Define the commands to control and monitor LEDs and buttons */
 
-/* STEP 3 - 3. Define the message ID used when subscribing to topics */
+/* STEP 3 - Define the message ID used when subscribing to topics */
 
 static struct net_mgmt_event_callback mgmt_cb;
 static bool connected;
 static K_SEM_DEFINE(run_app, 0, 1);
+
+/* STEP 10.1 - Declare the variable to store the client ID */
 
 
 static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
@@ -80,100 +79,38 @@ static void subscribe(void)
 
 }
 
-/* STEP 6 - Define the function to publish data */
-
-void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
+/* STEP 7 - Define the function to publish data */
+static int publish(uint8_t *data, size_t len)
 {
 	int err;
+	/* STEP 7.1 - Declare and populate a variable of type mqtt_publish_param */	
 
-	switch (evt->type) {
-	case MQTT_EVT_CONNACK:
-		/* STEP 4 - Upon a successful connection, subscribe to topics */
-		
-	case MQTT_EVT_DISCONNECT:
-		LOG_INF("MQTT client disconnected: %d", evt->result);
-		break;
 
-	case MQTT_EVT_PUBLISH:
-		/* STEP 5 - Listen to published messages received from the broker and extract the
-		 * message */
-		{
-			/* STEP 5.1 - Extract the payload and (if relevant) send acknowledgement */
+	/* STEP 7.2 - Publish to MQTT broker */
 
-			/* STEP 5.2 - On successful extraction of data, exmaine command and toggle
-			 * LED accordingly */
-
-			/* STEP 5.3 - On failed extraction of data, examine error code */
-			
-		}
-		break;
-	case MQTT_EVT_PUBACK:
-		if (evt->result != 0) {
-			LOG_ERR("MQTT PUBACK error: %d", evt->result);
-			break;
-		}
-		LOG_INF("PUBACK packet id: %u", evt->param.puback.message_id);
-		break;
-	case MQTT_EVT_SUBACK:
-		if (evt->result != 0) {
-			LOG_ERR("MQTT SUBACK error: %d", evt->result);
-			break;
-		}
-		LOG_INF("SUBACK packet id: %u", evt->param.suback.message_id);
-		break;
-	case MQTT_EVT_PINGRESP:
-		if (evt->result != 0) {
-			LOG_ERR("MQTT PINGRESP error: %d", evt->result);
-		}
-		break;
-	default:
-		LOG_INF("Unhandled MQTT event type: %d", evt->type);
-		break;
-	}
+	return 0;
 }
 
-static const uint8_t *client_id_get(void)
-{
-	static uint8_t client_id[MAX(sizeof(CONFIG_MQTT_CLIENT_ID), CLIENT_ID_LEN)];
+/* STEP 8.1 - Define callback handler for CONNACK event */
 
-	if (strlen(CONFIG_MQTT_CLIENT_ID) > 0) {
-		snprintf(client_id, sizeof(client_id), "%s", CONFIG_MQTT_CLIENT_ID);
-		goto exit;
-	}
 
-	uint32_t id = sys_rand32_get();
-	snprintf(client_id, sizeof(client_id), "%s-%010u", CONFIG_BOARD, id);
+/* STEP 8.2 - Define callback handler for SUBACK event */
 
-exit:
-	LOG_DBG("client_id = %s", (char *)client_id);
 
-	return client_id;
-}
+/* STEP 8.3 - Define callback handler for PUBLISH event */
 
-int client_init(struct mqtt_client *client)
-{
-	int err;
-	/* STEP 2.1 - Initialize the client instance */
 
-	/* STEP 2.2 - Resolve the configured hostname and initializes the MQTT broker structure */
+/* STEP 8.4 - Define callback handler for DISCONNECT event */
 
-	/* STEP 2.3 - MQTT client configuration */
 
-	/* STEP 2.4 - MQTT buffers configuration */
-
-	/* STEP 2.5 - Set the transport type to non-secure */
-
-	return err;
-}
 
 static void button_handler(uint32_t button_state, uint32_t has_changed)
 {
-	int err;
 	if (has_changed & DK_BTN1_MSK && button_state & DK_BTN1_MSK) {
-		/* STEP 7.1 - When button 1 is pressed, send a message */
+		/* STEP 9.1 - Publish message if button 1 is pressed */
 
 	} else if (has_changed & DK_BTN2_MSK && button_state & DK_BTN2_MSK) {
-		/* STEP 7.2 - When button 2 is pressed, send a message */
+		/* STEP 9.2 - Publish message if button 2 is pressed */
 
 	}
 }
@@ -181,7 +118,6 @@ static void button_handler(uint32_t button_state, uint32_t has_changed)
 int main(void)
 {
 	int err;
-	uint32_t connect_attempt = 0;
 
 	if (dk_leds_init() != 0) {
 		LOG_ERR("Failed to initialize the LED library");
@@ -200,36 +136,10 @@ int main(void)
 		LOG_ERR("Failed to initialize the buttons library");
 	}
 
-	LOG_INF("Connecting to MQTT broker");
+	/* STEP 9 - Initialize the MQTT helper library */
 
-	err = client_init(&client);
-	if (err) {
-		LOG_ERR("Failed to initialize MQTT client: %d", err);
-		return err;
-	}
+	/* STEP 10.2 - Generate the client ID */
 
-do_connect:
-	if (connect_attempt++ > 0) {
-		LOG_INF("Reconnecting in 60 seconds...");
-		k_sleep(K_SECONDS(60));
-	}
+	/* STEP 11 - Establish a connection the MQTT broker */
 
-	/* STEP 8 - Establish a connection the MQTT broker */
-
-	/* STEP 9.1 - Configure fds to monitor the socket */
-
-	while (1) {
-		/* STEP 9.2 - Continously poll the socket for incoming data */
-
-		/* STEP 9.3 - In the event of incoming data, process it */
-		
-	}
-
-	LOG_INF("Disconnecting MQTT client");
-
-	err = mqtt_disconnect(&client);
-	if (err) {
-		LOG_ERR("Could not disconnect MQTT client: %d", err);
-	}
-	goto do_connect;
 }
