@@ -28,8 +28,6 @@ LOG_MODULE_REGISTER(Lesson5_Exercise1, LOG_LEVEL_INF);
 
 #define EVENT_MASK (NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED)
 
-/* STEP 2 - Define the macros for the HTTP server hostname and port */
-
 
 /* STEP 3 - Declare the necessary buffers for receiving messages */
 
@@ -76,7 +74,7 @@ static int server_resolve(void)
 	struct addrinfo *result;
 	struct addrinfo hints = {.ai_family = AF_INET, .ai_socktype = SOCK_STREAM};
 
-	err = getaddrinfo(HTTP_HOSTNAME, STRINGIFY(HTTP_PORT), &hints, &result);
+	err = getaddrinfo(CONFIG_HTTP_SAMPLE_HOSTNAME, CONFIG_HTTP_SAMPLE_PORT, &hints, &result);
 	if (err != 0) {
 		LOG_ERR("getaddrinfo failed, err: %d, %s", err, gai_strerror(err));
 		return -EIO;
@@ -116,7 +114,7 @@ static int server_connect(void)
 		return -errno;
 	}
 
-LOG_INF("Connected to server");
+	LOG_INF("Connected to server");
 	return 0;
 }
 
@@ -196,8 +194,9 @@ int main(void)
 		return 0;
 	}
 
+	LOG_INF("Connecting to %s:%s", CONFIG_HTTP_SAMPLE_HOSTNAME, CONFIG_HTTP_SAMPLE_PORT);
 	if (server_connect() != 0) {
-		LOG_ERR("Failed to initialize client");
+		LOG_ERR("Failed to connect to server");
 		return 0;
 	}
 

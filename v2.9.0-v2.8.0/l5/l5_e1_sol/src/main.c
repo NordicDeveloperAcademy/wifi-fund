@@ -28,9 +28,6 @@ LOG_MODULE_REGISTER(Lesson5_Exercise1, LOG_LEVEL_INF);
 
 #define EVENT_MASK (NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED)
 
-/* STEP 2 - Define the macros for the HTTP server hostname and port */
-#define HTTP_HOSTNAME "echo.thingy.rocks"
-#define HTTP_PORT     80
 
 /* STEP 3 - Declare the necessary buffers for receiving messages */
 #define RECV_BUF_SIZE  2048
@@ -81,7 +78,7 @@ static int server_resolve(void)
 	struct addrinfo *result;
 	struct addrinfo hints = {.ai_family = AF_INET, .ai_socktype = SOCK_STREAM};
 
-	err = getaddrinfo(HTTP_HOSTNAME, STRINGIFY(HTTP_PORT), &hints, &result);
+	err = getaddrinfo(CONFIG_HTTP_SAMPLE_HOSTNAME, CONFIG_HTTP_SAMPLE_PORT, &hints, &result);
 	if (err != 0) {
 		LOG_ERR("getaddrinfo failed, err: %d, %s", err, gai_strerror(err));
 		return -EIO;
@@ -181,7 +178,7 @@ static int client_http_put(void)
 	req.header_fields = headers;
 	req.method = HTTP_PUT;
 	req.url = client_id_buf;
-	req.host = HTTP_HOSTNAME;
+	req.host = CONFIG_HTTP_SAMPLE_HOSTNAME;
 	req.protocol = "HTTP/1.1";
 	req.payload = buffer;
 	req.payload_len = bytes_written;
@@ -203,14 +200,14 @@ static int client_http_get(void)
 	/* STEP 8 - Define the function to send a GET request to the HTTP server */
 	int err = 0;
 	const char *headers[] = {"Connection: close\r\n", NULL};
-	
+
 	struct http_request req;
 	memset(&req, 0, sizeof(req));
 
 	req.header_fields = headers;
 	req.method = HTTP_GET;
 	req.url = client_id_buf;
-	req.host = HTTP_HOSTNAME;
+	req.host = CONFIG_HTTP_SAMPLE_HOSTNAME;
 	req.protocol = "HTTP/1.1";
 	req.response = response_cb;
 	req.recv_buf = recv_buf;
@@ -238,7 +235,7 @@ static int client_get_new_id(void)
 	req.header_fields = headers;
 	req.method = HTTP_POST;
 	req.url = "/new";
-	req.host = HTTP_HOSTNAME;
+	req.host = CONFIG_HTTP_SAMPLE_HOSTNAME;
 	req.protocol = "HTTP/1.1";
 	req.response = client_id_cb;
 	req.recv_buf = recv_buf;
@@ -292,10 +289,11 @@ int main(void)
 		return 0;
 	}
 
+	LOG_INF("Connecting to %s:%s", CONFIG_HTTP_SAMPLE_HOSTNAME, CONFIG_HTTP_SAMPLE_PORT);
 	if (server_connect() != 0) {
-		LOG_ERR("Failed to initialize client");
+		LOG_ERR("Failed to connect to server");
 		return 0;
-	}	
+	}
 
 	/* STEP 11 - Retrieve the client ID upon connection */
 	if (client_get_new_id() < 0) {
