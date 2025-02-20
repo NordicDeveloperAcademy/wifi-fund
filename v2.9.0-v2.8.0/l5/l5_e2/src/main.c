@@ -22,22 +22,15 @@
 #include <zephyr/net/socket.h>
 #include <zephyr/net/http/client.h>
 
-/* STEP 1.4 - Include the header file for the TLS credentials library */
-
-
-/* STEP 2.3 - Include the certificate */
+/* STEP 1.5 - Include the header file for the TLS credentials library */
 
 
 LOG_MODULE_REGISTER(Lesson5_Exercise2, LOG_LEVEL_INF);
 
 #define EVENT_MASK (NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED)
 
-/* STEP 4.1 - Define a macro for the credential security tag */
+/* STEP 4.1 - Define a macro for the credentials security tag */
 
-
-#define HTTP_HOSTNAME "echo.thingy.rocks"
-/* STEP 3 - Change the HTTP port numer */
-#define HTTP_PORT     80
 
 #define RECV_BUF_SIZE  2048
 #define CLIENT_ID_SIZE 36
@@ -53,6 +46,10 @@ static struct sockaddr_storage server;
 static struct net_mgmt_event_callback mgmt_cb;
 static bool connected;
 static K_SEM_DEFINE(run_app, 0, 1);
+
+/* STEP 2.3 - Include the certificate */
+
+
 
 static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
 				   struct net_if *iface)
@@ -86,7 +83,7 @@ static int server_resolve(void)
 	struct addrinfo *result;
 	struct addrinfo hints = {.ai_family = AF_INET, .ai_socktype = SOCK_STREAM};
 
-	err = getaddrinfo(HTTP_HOSTNAME, STRINGIFY(HTTP_PORT), &hints, &result);
+	err = getaddrinfo(CONFIG_HTTP_SAMPLE_HOSTNAME, CONFIG_HTTP_SAMPLE_PORT, &hints, &result);
 	if (err != 0) {
 		LOG_ERR("getaddrinfo failed, err: %d, %s", err, gai_strerror(err));
 		return -EIO;
@@ -113,11 +110,11 @@ static int server_resolve(void)
 
 static int setup_credentials(void)
 {
-	
-	/* STEP 4.2 - Add the credential to the device */
+	LOG_INF("Provisioning server certificate");
+	/* STEP 4.2 - Provision the credential to the device */
 
 
-	return 0;
+	return err;
 }
 
 static int server_connect(void)
@@ -154,9 +151,9 @@ static void response_cb(struct http_response *rsp, enum http_final_call final_da
 		body_buf[rsp->body_frag_len] = '\0';
 		LOG_INF("Received: %s", body_buf);
 	}
-	
+
 	LOG_INF("Closing socket: %d", sock);
-	close(sock);	
+	close(sock);
 }
 
 static void client_id_cb(struct http_response *rsp, enum http_final_call final_data,
@@ -172,7 +169,7 @@ static void client_id_cb(struct http_response *rsp, enum http_final_call final_d
 
 	LOG_INF("Successfully acquired client ID: %s", client_id_buf);
 	LOG_INF("Closing socket: %d", sock);
-	close(sock);	
+	close(sock);
 }
 
 static int client_http_put(void)
@@ -194,7 +191,7 @@ static int client_http_put(void)
 	req.header_fields = headers;
 	req.method = HTTP_PUT;
 	req.url = client_id_buf;
-	req.host = HTTP_HOSTNAME;
+	req.host = CONFIG_HTTP_SAMPLE_HOSTNAME;
 	req.protocol = "HTTP/1.1";
 	req.payload = buffer;
 	req.payload_len = bytes_written;
@@ -207,7 +204,7 @@ static int client_http_put(void)
 	if (err < 0) {
 		LOG_ERR("Failed to send HTTP PUT request %s, err: %d", buffer, err);
 	}
-	
+
 	return err;
 }
 
@@ -222,7 +219,7 @@ static int client_http_get(void)
 	req.header_fields = headers;
 	req.method = HTTP_GET;
 	req.url = client_id_buf;
-	req.host = HTTP_HOSTNAME;
+	req.host = CONFIG_HTTP_SAMPLE_HOSTNAME;
 	req.protocol = "HTTP/1.1";
 	req.response = response_cb;
 	req.recv_buf = recv_buf;
@@ -248,7 +245,7 @@ static int client_get_new_id(void)
 	req.header_fields = headers;
 	req.method = HTTP_POST;
 	req.url = "/new";
-	req.host = HTTP_HOSTNAME;
+	req.host = CONFIG_HTTP_SAMPLE_HOSTNAME;
 	req.protocol = "HTTP/1.1";
 	req.response = client_id_cb;
 	req.recv_buf = recv_buf;
@@ -304,8 +301,9 @@ int main(void)
 		LOG_ERR("Setup credentials failed");
 	}
 
+	LOG_INF("Connecting to %s:%s", CONFIG_HTTP_SAMPLE_HOSTNAME, CONFIG_HTTP_SAMPLE_PORT);
 	if (server_connect() != 0) {
-		LOG_ERR("Failed to initialize client");
+		LOG_ERR("Failed to connect to server");
 		return 0;
 	}
 

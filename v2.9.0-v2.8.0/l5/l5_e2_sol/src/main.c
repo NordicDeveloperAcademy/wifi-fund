@@ -22,24 +22,15 @@
 #include <zephyr/net/socket.h>
 #include <zephyr/net/http/client.h>
 
-/* STEP 1.4 - Include the header file for the TLS credentials library */
+/* STEP 1.5 - Include the header file for the TLS credentials library */
 #include <zephyr/net/tls_credentials.h>
-
-/* STEP 2.3 - Include the certificate */
-static const char ca_certificate[] = {
-#include "certificate.h"
-};
 
 LOG_MODULE_REGISTER(Lesson5_Exercise2, LOG_LEVEL_INF);
 
 #define EVENT_MASK (NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED)
 
-/* STEP 4.1 - Define a macro for the credential security tag */
-#define HTTP_TLS_SEC_TAG 1
-
-#define HTTP_HOSTNAME "echo.thingy.rocks"
-/* STEP 3 - Change the HTTP port numer */
-#define HTTP_PORT     443
+/* STEP 4.1 - Define a macro for the credentials security tag */
+#define HTTP_TLS_SEC_TAG 42
 
 #define RECV_BUF_SIZE  2048
 #define CLIENT_ID_SIZE 36
@@ -55,6 +46,13 @@ static struct sockaddr_storage server;
 static struct net_mgmt_event_callback mgmt_cb;
 static bool connected;
 static K_SEM_DEFINE(run_app, 0, 1);
+
+/* STEP 2.3 - Include the certificate */
+static const char ca_certificate[] = {
+	#include "AmazonRootCA1.pem.inc"
+	IF_ENABLED(CONFIG_TLS_CREDENTIALS, (0x00))
+};
+
 
 static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
 				   struct net_if *iface)
@@ -88,7 +86,7 @@ static int server_resolve(void)
 	struct addrinfo *result;
 	struct addrinfo hints = {.ai_family = AF_INET, .ai_socktype = SOCK_STREAM};
 
-	err = getaddrinfo(HTTP_HOSTNAME, STRINGIFY(HTTP_PORT), &hints, &result);
+	err = getaddrinfo(CONFIG_HTTP_SAMPLE_HOSTNAME, CONFIG_HTTP_SAMPLE_PORT, &hints, &result);
 	if (err != 0) {
 		LOG_ERR("getaddrinfo failed, err: %d, %s", err, gai_strerror(err));
 		return -EIO;
@@ -115,16 +113,16 @@ static int server_resolve(void)
 
 static int setup_credentials(void)
 {
-	
-	/* STEP 4.2 - Add the credential to the device */
+	LOG_INF("Provisioning server certificate");
+	/* STEP 4.2 - Provision the credential to the device */
 	int err = tls_credential_add(HTTP_TLS_SEC_TAG, TLS_CREDENTIAL_CA_CERTIFICATE, ca_certificate,
 				 sizeof(ca_certificate));
-	if (err < 0) {
-		LOG_ERR("Failed to add TLS credentials, err: %d", err);
-		return err;
+	if (err == -EEXIST){
+		LOG_ERR("Certificate already exists, sec tag: %d", HTTP_TLS_SEC_TAG);
+	} else if (err < 0) {
+		LOG_ERR("Failed to provision server certificate: %d", err);
 	}
-
-	return 0;
+	return err;
 }
 
 static int server_connect(void)
@@ -147,7 +145,7 @@ static int server_connect(void)
 		return -errno;
 	}
 	/* STEP 5.2 - Configure the socket with the hostname of the HTTP server */
-	err = setsockopt(sock, SOL_TLS, TLS_HOSTNAME, HTTP_HOSTNAME, sizeof(HTTP_HOSTNAME));
+	err = setsockopt(sock, SOL_TLS, TLS_HOSTNAME, CONFIG_HTTP_SAMPLE_HOSTNAME, sizeof(CONFIG_HTTP_SAMPLE_HOSTNAME));
 	if (err < 0) {
 		LOG_ERR("Failed to set TLS_HOSTNAME option. Err: %d", errno);
 		(void)close(sock);
@@ -176,7 +174,7 @@ static void response_cb(struct http_response *rsp, enum http_final_call final_da
 	}
 
 	LOG_INF("Closing socket: %d", sock);
-	close(sock);	
+	close(sock);
 }
 
 static void client_id_cb(struct http_response *rsp, enum http_final_call final_data,
@@ -214,7 +212,7 @@ static int client_http_put(void)
 	req.header_fields = headers;
 	req.method = HTTP_PUT;
 	req.url = client_id_buf;
-	req.host = HTTP_HOSTNAME;
+	req.host = CONFIG_HTTP_SAMPLE_HOSTNAME;
 	req.protocol = "HTTP/1.1";
 	req.payload = buffer;
 	req.payload_len = bytes_written;
@@ -227,7 +225,7 @@ static int client_http_put(void)
 	if (err < 0) {
 		LOG_ERR("Failed to send HTTP PUT request %s, err: %d", buffer, err);
 	}
-	
+
 	return err;
 }
 
@@ -242,7 +240,7 @@ static int client_http_get(void)
 	req.header_fields = headers;
 	req.method = HTTP_GET;
 	req.url = client_id_buf;
-	req.host = HTTP_HOSTNAME;
+	req.host = CONFIG_HTTP_SAMPLE_HOSTNAME;
 	req.protocol = "HTTP/1.1";
 	req.response = response_cb;
 	req.recv_buf = recv_buf;
@@ -268,7 +266,7 @@ static int client_get_new_id(void)
 	req.header_fields = headers;
 	req.method = HTTP_POST;
 	req.url = "/new";
-	req.host = HTTP_HOSTNAME;
+	req.host = CONFIG_HTTP_SAMPLE_HOSTNAME;
 	req.protocol = "HTTP/1.1";
 	req.response = client_id_cb;
 	req.recv_buf = recv_buf;
@@ -324,8 +322,9 @@ int main(void)
 		LOG_ERR("Setup credentials failed");
 	}
 
+	LOG_INF("Connecting to %s:%s", CONFIG_HTTP_SAMPLE_HOSTNAME, CONFIG_HTTP_SAMPLE_PORT);
 	if (server_connect() != 0) {
-		LOG_ERR("Failed to initialize client");
+		LOG_ERR("Failed to connect to server");
 		return 0;
 	}
 
