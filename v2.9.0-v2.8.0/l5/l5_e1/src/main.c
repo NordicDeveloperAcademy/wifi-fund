@@ -202,6 +202,7 @@ int main(void)
 
 	/* STEP 11 - Retrieve the client ID upon connection */
 
+	/* STEP 12 - Send a PUT request to HTTP server */
 
 	return 0;
 }

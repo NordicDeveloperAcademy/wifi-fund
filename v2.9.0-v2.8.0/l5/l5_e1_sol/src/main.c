@@ -300,5 +300,11 @@ int main(void)
 		return 0;
 	}
 
+	/* STEP 12 - Send a PUT request to HTTP server */
+	if (server_connect() >= 0) {
+		client_http_put();
+		counter++;
+	}
+
 	return 0;
 }

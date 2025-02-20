@@ -312,5 +312,10 @@ int main(void)
 		return 0;
 	}
 
+	if (server_connect() >= 0) {
+		client_http_put();
+		counter++;
+	}
+
 	return 0;
 }
