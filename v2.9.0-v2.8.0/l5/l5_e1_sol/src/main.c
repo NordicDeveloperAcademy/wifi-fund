@@ -28,7 +28,6 @@ LOG_MODULE_REGISTER(Lesson5_Exercise1, LOG_LEVEL_INF);
 
 #define EVENT_MASK (NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED)
 
-
 /* STEP 3 - Declare the necessary buffers for receiving messages */
 #define RECV_BUF_SIZE  2048
 #define CLIENT_ID_SIZE 36
