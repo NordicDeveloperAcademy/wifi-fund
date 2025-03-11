@@ -31,16 +31,12 @@ LOG_MODULE_REGISTER(Lesson6_Exercise2, LOG_LEVEL_INF);
 /* STEP 1.1 - Define the IPv4 address and port for the server */
 
 
-#define SSTRLEN(s) (sizeof(s) - 1)
-#define RECV_BUF_SIZE 256
+#define MESSAGE_SIZE	256
+#define MESSAGE_TO_SEND "Hello from nRF70 Series"
+#define SSTRLEN(s)    (sizeof(s) - 1)
 
 static int counter = 0;
 static int recv_counter = 0;
-
-static int sock;
-static struct sockaddr_in server;
-
-static uint8_t recv_buf[RECV_BUF_SIZE];
 
 int send_packet();
 int receive_packet();

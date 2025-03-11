@@ -39,11 +39,6 @@ LOG_MODULE_REGISTER(Lesson6_Exercise2, LOG_LEVEL_INF);
 static int counter = 0;
 static int recv_counter = 0;
 
-static int sock;
-static struct sockaddr_in server;
-
-static uint8_t recv_buf[RECV_BUF_SIZE];
-
 int send_packet();
 int receive_packet();
 
@@ -288,6 +283,8 @@ static void button_handler(uint32_t button_state, uint32_t has_changed)
 
 int main(void)
 {
+	int received;
+
 	if (dk_leds_init() != 0) {
 		LOG_ERR("Failed to initialize the LED library");
 	}
