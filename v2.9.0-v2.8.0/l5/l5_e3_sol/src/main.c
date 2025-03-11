@@ -15,6 +15,7 @@
 
 #include <dk_buttons_and_leds.h>
 
+#include <zephyr/net/net_config.h>
 #include <zephyr/net/wifi.h>
 #include <zephyr/net/wifi_mgmt.h>
 #include <zephyr/net/net_mgmt.h>
@@ -24,19 +25,25 @@
 #include <zephyr/net/http/client.h>
 
 #include <zephyr/net/conn_mgr_monitor.h>
+#include <zephyr/net/conn_mgr_connectivity.h>
+
+#include <zephyr/net/net_ip.h>
+#include <zephyr/net/dns_sd.h>
+
 
 /* STEP 3 - Include Zephyr's HTTP parser header file */
 #include <zephyr/net/http/parser.h>
 
 LOG_MODULE_REGISTER(Lesson5_Exercise3, LOG_LEVEL_INF);
 
-/* STEP 4 - Define the port number for the server */
-#define SERVER_PORT 8080
-
 #define MAX_CLIENT_QUEUE 2
 #define STACK_SIZE	 4096
 #define THREAD_PRIORITY	 K_PRIO_COOP(CONFIG_NUM_COOP_PRIORITIES - 1)
 #define EVENT_MASK	 (NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED)
+
+/* STEP x - Register service to be advertised via DNS */
+DNS_SD_REGISTER_TCP_SERVICE(http_server_sd, CONFIG_NET_HOSTNAME, "_http", "local",
+			    DNS_SD_EMPTY_TXT, CONFIG_HTTP_SERVER_SAMPLE_PORT);
 
 /* STEP 5 - Define a struct to represent the structure of HTTP requests */
 struct http_req {
@@ -156,7 +163,7 @@ static void handle_http_request(struct http_req *request)
 		size_t led_id;
 		int ret = sscanf(url, "/led/%u", &led_id);
 
-		LOG_DBG("PUT %s", url);
+		LOG_INF("PUT %s", url);
 
 		/* Handle PUT requests to the "led" resource. It is safe to use strcmp() because
 		 * we know that both strings are null-terminated. Otherwise, strncmp would be used.
@@ -177,7 +184,7 @@ static void handle_http_request(struct http_req *request)
 		size_t led_id;
 		int ret = sscanf(url, "/led/%u", &led_id);
 
-		LOG_DBG("GET %s", url);
+		LOG_INF("GET %s", url);
 
 		/* Handle GET requests to the "led" resource */
 		if ((ret == 1) && (led_id > 0) && (led_id < (ARRAY_SIZE(led_states) + 1))) {
@@ -342,7 +349,7 @@ static void client_conn_handler(void *ptr1, void *ptr2, void *ptr3)
 		received = recv(request.socket, buf + offset, sizeof(buf) - offset, 0);
 		if (received == 0) {
 			/* Connection closed */
-			LOG_DBG("[%d] Connection closed by peer", request.socket);
+			LOG_INF("[%d] Connection closed by peer", request.socket);
 			break;
 		} else if (received < 0) {
 			/* Socket error */
@@ -436,7 +443,7 @@ static void process_tcp4(void)
 	int ret;
 	struct sockaddr_in addr4 = {
 		.sin_family = AF_INET,
-		.sin_port = htons(SERVER_PORT),
+		.sin_port = htons(CONFIG_HTTP_SERVER_SAMPLE_PORT),
 	};
 
 	ret = setup_server(&tcp4_listen_sock, (struct sockaddr *)&addr4, sizeof(addr4));
@@ -444,9 +451,9 @@ static void process_tcp4(void)
 		return;
 	}
 
-	LOG_DBG("Waiting for IPv4 HTTP connections on port %d, sock %d", SERVER_PORT,
+	LOG_INF("Waiting for IPv4 HTTP connections on port %d, sock %d", CONFIG_HTTP_SERVER_SAMPLE_PORT,
 		tcp4_listen_sock);
-
+	LOG_INF("Connect to %s.%s:%d", CONFIG_NET_HOSTNAME, "local", CONFIG_HTTP_SERVER_SAMPLE_PORT);
 	while (ret == 0) {
 		ret = process_tcp(&tcp4_listen_sock, tcp4_accepted);
 	}
