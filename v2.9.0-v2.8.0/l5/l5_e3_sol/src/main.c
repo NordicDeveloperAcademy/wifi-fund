@@ -138,8 +138,7 @@ static bool handle_led_update(struct http_req *request, size_t led_id)
 	}
 
 	(void)dk_set_led(led_index, led_states[led_index]);
-
-	LOG_INF("LED state updated to %d", led_states[led_index]);
+	LOG_INF("LED%d turned %s", led_id, new_state == 1 ? "on" : "off");
 
 	return true;
 }
@@ -161,11 +160,9 @@ static void handle_http_request(struct http_req *request)
 		size_t led_id;
 		int ret = sscanf(url, "/led/%u", &led_id);
 
-		LOG_INF("PUT %s", url);
+		LOG_INF("Received PUT request to %s", url);
 
-		/* Handle PUT requests to the "led" resource. It is safe to use strcmp() because
-		 * we know that both strings are null-terminated. Otherwise, strncmp would be used.
-		 */
+		/* Handle PUT requests to the "led" resource */
 		if ((ret == 1) && (led_id > 0) && (led_id < (ARRAY_SIZE(led_states) + 1))) {
 			if (handle_led_update(request, led_id)) {
 				(void)snprintk(dynamic_response_buf, sizeof(dynamic_response_buf),
@@ -182,7 +179,7 @@ static void handle_http_request(struct http_req *request)
 		size_t led_id;
 		int ret = sscanf(url, "/led/%u", &led_id);
 
-		LOG_INF("GET %s", url);
+		LOG_INF("Received GET request to %s", url);
 
 		/* Handle GET requests to the "led" resource */
 		if ((ret == 1) && (led_id > 0) && (led_id < (ARRAY_SIZE(led_states) + 1))) {
@@ -424,7 +421,7 @@ static int process_tcp(int *sock, int *accepted)
 
 	net_addr_ntop(client_addr.sin_family, &client_addr.sin_addr, addr_str, sizeof(addr_str));
 
-	LOG_INF("[%d] Connection #%d from %s", client, ++counter, addr_str);
+	LOG_DBG("[%d] Connection #%d from %s", client, ++counter, addr_str);
 
 	return 0;
 }
