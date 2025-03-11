@@ -283,6 +283,7 @@ int main(void)
 	if (dk_buttons_init(button_handler) != 0) {
 		LOG_ERR("Failed to initialize the buttons library");
 	}
+
 	if (server_resolve() != 0) {
 		LOG_ERR("Failed to resolve server name");
 		return 0;
