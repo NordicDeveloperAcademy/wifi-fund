@@ -25,15 +25,16 @@ LOG_MODULE_REGISTER(Lesson6_Exercise2, LOG_LEVEL_INF);
 
 #define EVENT_MASK (NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED)
 
-/* STEP 3.1 - Define mask for TWT events. */
+/* STEP 3.1 - Define a mask for the TWT events */
 #define TWT_MGMT_EVENTS (NET_EVENT_WIFI_TWT | NET_EVENT_WIFI_TWT_SLEEP_STATE)
 
-/* STEP 1.1 - Define the port and IPv4 address for the server. */
+/* STEP 1.1 - Define the IPv4 address and port for the server */
+#define SERVER_IPV4_ADDR "<your_IP_address>"
 #define SERVER_PORT	 7777
-#define SERVER_IPV4_ADDR "192.168.32.119"
 
+#define MESSAGE_SIZE	256
+#define MESSAGE_TO_SEND "Hello from nRF70 Series"
 #define SSTRLEN(s)    (sizeof(s) - 1)
-#define RECV_BUF_SIZE 256
 
 static int counter = 0;
 static int recv_counter = 0;
@@ -46,12 +47,11 @@ static uint8_t recv_buf[RECV_BUF_SIZE];
 int send_packet();
 int receive_packet();
 
-/* STEP 1.2 - Define macros for wakeup time and interval for TWT.  */
+/* STEP 1.2 - Define macros for wakeup time and interval for TWT  */
 #define TWT_WAKE_INTERVAL_MS 65
 #define TWT_INTERVAL_MS	     7000
 
-/* STEP 1.3 - Create variables to keep track of TWT status, flow ID, and if sending packets is
- * enabled. */
+/* STEP 1.3 - Create variables for TWT status, flow ID, and sending packets */
 bool nrf_wifi_twt_enabled = 0;
 static uint32_t twt_flow_id = 1;
 bool sending_packets_enabled = 0;
@@ -61,32 +61,34 @@ static struct net_mgmt_event_callback twt_mgmt_cb;
 static bool connected;
 static K_SEM_DEFINE(run_app, 0, 1);
 
+static int sock;
+static struct sockaddr_in server;
+
+static uint8_t recv_buf[MESSAGE_SIZE];
+
 static void handle_wifi_twt_event(struct net_mgmt_event_callback *cb)
 {
-	/* STEP 4.1 - Create a wifi_twt_params struct for the received TWT event and fill it with
-	 * the event information. */
+	/* STEP 4.1 - Create a struct for the received TWT event */
 	const struct wifi_twt_params *resp = (const struct wifi_twt_params *)cb->info;
 
-	/* STEP 4.2 - If the event was a TWT teardown iniatiated by the AP, set change the value of
-	 * nrf_wifi_twt_enabled and exit the function.  */
+	/* STEP 4.2 - Upon a TWT teardown initiated by the AP, toggle the state */
 	if (resp->operation == WIFI_TWT_TEARDOWN) {
 		LOG_INF("TWT teardown received for flow ID %d\n", resp->flow_id);
 		nrf_wifi_twt_enabled = 0;
 		return;
 	}
 
-	/* STEP 4.3 - Update twt_flow_id to reflect the flow ID received in the TWT response. */
+	/* STEP 4.3 - Update the flow ID received in the TWT response */
 	twt_flow_id = resp->flow_id;
 
-	/* STEP 4.4 - Check if a TWT response was received. If not, the TWT request timed out. */
+	/* STEP 4.4 - Check if a TWT response was received */
 	if (resp->resp_status == WIFI_TWT_RESP_RECEIVED) {
 		LOG_INF("TWT response: %s", wifi_twt_setup_cmd_txt(resp->setup_cmd));
 	} else {
 		LOG_INF("TWT response timed out\n");
 		return;
 	}
-	/* STEP 4.5 - If the TWT setup was accepted, change the value of nrf_wifi_twt_enabled and
-	 * print the negotiated parameters. */
+	/* STEP 4.5 - Upon an accepted TWT setup, log the negotiated parameters */
 	if (resp->setup_cmd == WIFI_TWT_SETUP_CMD_ACCEPT) {
 		nrf_wifi_twt_enabled = 1;
 
@@ -142,9 +144,7 @@ static void twt_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint32_t 
 	case NET_EVENT_WIFI_TWT:
 		handle_wifi_twt_event(cb);
 		break;
-	/* STEP 3.2.2 -	Upon TWT sleep state event, inform the user of the current sleep state.
-	 * When the device is in the awake state, send a packet to the server and check for any
-	 * received packets if sending packets is enabled. */
+	/* STEP 3.2.2 -	Upon TWT sleep state event, inform the user of the current sleep state */
 	case NET_EVENT_WIFI_TWT_SLEEP_STATE:
 		int *twt_state;
 		twt_state = (int *)(cb->info);
@@ -161,43 +161,40 @@ int wifi_set_twt()
 {
 	struct net_if *iface = net_if_get_first_wifi();
 
-	/* STEP 2.1 - Define the TWT parameters struct wifi_twt_params and fill the parameters that
-	 * are common for both TWT setup and TWT teardown. */
-	struct wifi_twt_params params = {0};
+	/* STEP 2.1 - Define the TWT parameters struct */
+	struct wifi_twt_params twt_params = {0};
 
-	params.negotiation_type = WIFI_TWT_INDIVIDUAL;
-	params.flow_id = twt_flow_id;
-	params.dialog_token = 1;
+	twt_params.negotiation_type = WIFI_TWT_INDIVIDUAL;
+	twt_params.flow_id = twt_flow_id;
+	twt_params.dialog_token = 1;
 
 	if (!nrf_wifi_twt_enabled) {
-		/* STEP 2.2.1 - Fill in the TWT setup specific parameters of the wifi_twt_params
-		 * struct. */
-		params.operation = WIFI_TWT_SETUP;
-		params.setup_cmd = WIFI_TWT_SETUP_CMD_REQUEST;
-		params.setup.responder = 0;
-		params.setup.trigger = 0;
-		params.setup.implicit = 1;
-		params.setup.announce = 0;
-		params.setup.twt_wake_interval = TWT_WAKE_INTERVAL_MS * USEC_PER_MSEC;
-		params.setup.twt_interval = TWT_INTERVAL_MS * USEC_PER_MSEC;
+		/* STEP 2.2.1 - Fill in the TWT setup specific parameters */
+		twt_params.operation = WIFI_TWT_SETUP;
+		twt_params.setup_cmd = WIFI_TWT_SETUP_CMD_REQUEST;
+		twt_params.setup.responder = 0;
+		twt_params.setup.trigger = 0;
+		twt_params.setup.implicit = 1;
+		twt_params.setup.announce = 0;
+		twt_params.setup.twt_wake_interval = TWT_WAKE_INTERVAL_MS * USEC_PER_MSEC;
+		twt_params.setup.twt_interval = TWT_INTERVAL_MS * USEC_PER_MSEC;
 	} else {
-		/* STEP 2.2.2 - Fill in the TWT teardown specific parameters of the wifi_twt_params
-		 * struct. */
-		params.operation = WIFI_TWT_TEARDOWN;
-		params.setup_cmd = WIFI_TWT_TEARDOWN;
+		/* STEP 2.2.2 - Fill in the TWT teardown specific parameters */
+		twt_params.operation = WIFI_TWT_TEARDOWN;
+		twt_params.setup_cmd = WIFI_TWT_TEARDOWN;
 		twt_flow_id = twt_flow_id < WIFI_MAX_TWT_FLOWS ? twt_flow_id + 1 : 1;
 		nrf_wifi_twt_enabled = 0;
 	}
 
-	/* STEP 2.3 - Send the TWT request with net_mgmt. */
-	if (net_mgmt(NET_REQUEST_WIFI_TWT, iface, &params, sizeof(params))) {
-		LOG_ERR("%s with %s failed, reason : %s", wifi_twt_operation_txt(params.operation),
-			wifi_twt_negotiation_type_txt(params.negotiation_type),
-			wifi_twt_get_err_code_str(params.fail_reason));
+	/* STEP 2.3 - Send the TWT request with net_mgmt */
+	if (net_mgmt(NET_REQUEST_WIFI_TWT, iface, &twt_params, sizeof(twt_params))) {
+		LOG_ERR("%s with %s failed, reason : %s", wifi_twt_operation_txt(twt_params.operation),
+			wifi_twt_negotiation_type_txt(twt_params.negotiation_type),
+			wifi_twt_get_err_code_str(twt_params.fail_reason));
 		return -1;
 	}
 	LOG_INF("-------------------------------");
-	LOG_INF("TWT operation %s requested", wifi_twt_operation_txt(params.operation));
+	LOG_INF("TWT operation %s requested", wifi_twt_operation_txt(twt_params.operation));
 	LOG_INF("-------------------------------");
 	return 0;
 }
@@ -205,6 +202,7 @@ int wifi_set_twt()
 static int server_connect(void)
 {
 	int err;
+	
 	server.sin_family = AF_INET;
 	server.sin_port = htons(SERVER_PORT);
 
@@ -216,15 +214,14 @@ static int server_connect(void)
 	}
 
 	sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-
 	if (sock < 0) {
-		LOG_INF("Failed to create socket, err: %d, %s", errno, strerror(errno));
+		LOG_ERR("Failed to create socket, err: %d, %s", errno, strerror(errno));
 		return -errno;
 	}
 
 	err = connect(sock, (struct sockaddr *)&server, sizeof(server));
 	if (err < 0) {
-		LOG_INF("Connecting to server failed, err: %d, %s", errno, strerror(errno));
+		LOG_ERR("Connecting to server failed, err: %d, %s", errno, strerror(errno));
 		return -errno;
 	}
 	LOG_INF("Connected to server");
@@ -277,13 +274,12 @@ static void button_handler(uint32_t button_state, uint32_t has_changed)
 {
 	uint32_t button = button_state & has_changed;
 
-	/* STEP 5.1 - Call wifi_set_twt() to enable or disable TWT when button 1 is pressed. */
+	/* STEP 5.1 - Enable or disable TWT when button 1 is pressed */
 	if (button & DK_BTN1_MSK) {
 		wifi_set_twt();
 	}
 
-	/* STEP 5.2 - Enable or disable sending packets during TWT awake when button 2 is pressed.
-	 */
+	/* STEP 5.2 - Enable or disable sending packets during TWT awake when button 2 is pressed */
 	if (button & DK_BTN2_MSK) {
 		sending_packets_enabled = !sending_packets_enabled;
 		LOG_INF("Sending packets %s", sending_packets_enabled ? "enabled" : "disabled");
@@ -313,8 +309,9 @@ int main(void)
 		LOG_ERR("Failed to initialize the buttons library");
 	}
 
+	LOG_INF("Connecting to %s:%d", SERVER_IPV4_ADDR, SERVER_PORT);	
 	if (server_connect() != 0) {
-		LOG_INF("Failed to initialize client");
+		LOG_ERR("Failed to connect to server");
 		return 0;
 	}
 
