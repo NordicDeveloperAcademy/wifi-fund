@@ -15,6 +15,9 @@
 
 #include <dk_buttons_and_leds.h>
 
+#include <zephyr/net/net_config.h>
+#include <zephyr/net/net_ip.h>
+#include <zephyr/net/dns_sd.h>
 #include <zephyr/net/wifi.h>
 #include <zephyr/net/wifi_mgmt.h>
 #include <zephyr/net/net_mgmt.h>
@@ -24,19 +27,19 @@
 #include <zephyr/net/http/client.h>
 
 #include <zephyr/net/conn_mgr_monitor.h>
+#include <zephyr/net/conn_mgr_connectivity.h>
 
-/* STEP 3 - Include Zephyr's HTTP parser header file */
+/* STEP 2.2 - Include the header file for the HTTP parser library */
 
 
 LOG_MODULE_REGISTER(Lesson5_Exercise3, LOG_LEVEL_INF);
 
-/* STEP 4 - Define the port number for the server */
-
-
 #define MAX_CLIENT_QUEUE		2
-#define STACK_SIZE			4096
+#define STACK_SIZE			    4096
 #define THREAD_PRIORITY			K_PRIO_COOP(CONFIG_NUM_COOP_PRIORITIES - 1)
-#define EVENT_MASK (NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED)
+#define EVENT_MASK              (NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED)
+
+/* STEP 4 - Register service to be advertised via DNS */
 
 /* STEP 5 - Define a struct to represent the structure of HTTP requests */
 
@@ -125,8 +128,10 @@ static int get_free_slot(int *accepted)
 	return -1;
 }
 
-/* STEP 14 - Setup functions to handle incoming TCP connections */
+/* STEP 14.1 - Define a function to handle incoming TCP connections */
 
+
+/* STEP 14.2 - Define a function to process incoming IPv4 clients */
 
 /* STEP 15.1 - Define function to start listening on TCP socket */
 
@@ -151,8 +156,8 @@ int main(void)
 	/* Wait for the connection. */
 	k_sem_take(&run_app, K_FOREVER);
 
-	/* STEP 15.2 - Call the start_listener function */
-	
+	/* STEP 15.2 - Start listening on the TCP socket */
+
 
 	(void)err;
 

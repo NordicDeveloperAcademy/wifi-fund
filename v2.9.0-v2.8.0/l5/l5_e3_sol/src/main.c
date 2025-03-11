@@ -16,6 +16,8 @@
 #include <dk_buttons_and_leds.h>
 
 #include <zephyr/net/net_config.h>
+#include <zephyr/net/net_ip.h>
+#include <zephyr/net/dns_sd.h>
 #include <zephyr/net/wifi.h>
 #include <zephyr/net/wifi_mgmt.h>
 #include <zephyr/net/net_mgmt.h>
@@ -27,21 +29,17 @@
 #include <zephyr/net/conn_mgr_monitor.h>
 #include <zephyr/net/conn_mgr_connectivity.h>
 
-#include <zephyr/net/net_ip.h>
-#include <zephyr/net/dns_sd.h>
-
-
-/* STEP 3 - Include Zephyr's HTTP parser header file */
+/* STEP 2.2 - Include the header file for the HTTP parser library */
 #include <zephyr/net/http/parser.h>
 
 LOG_MODULE_REGISTER(Lesson5_Exercise3, LOG_LEVEL_INF);
 
-#define MAX_CLIENT_QUEUE 2
-#define STACK_SIZE	 4096
-#define THREAD_PRIORITY	 K_PRIO_COOP(CONFIG_NUM_COOP_PRIORITIES - 1)
-#define EVENT_MASK	 (NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED)
+#define MAX_CLIENT_QUEUE		2
+#define STACK_SIZE			    4096
+#define THREAD_PRIORITY			K_PRIO_COOP(CONFIG_NUM_COOP_PRIORITIES - 1)
+#define EVENT_MASK              (NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED)
 
-/* STEP x - Register service to be advertised via DNS */
+/* STEP 4 - Register service to be advertised via DNS */
 DNS_SD_REGISTER_TCP_SERVICE(http_server_sd, CONFIG_NET_HOSTNAME, "_http", "local",
 			    DNS_SD_EMPTY_TXT, CONFIG_HTTP_SERVER_SAMPLE_PORT);
 
@@ -87,8 +85,8 @@ static struct net_mgmt_event_callback mgmt_cb;
 static bool connected;
 static K_SEM_DEFINE(run_app, 0, 1);
 
-static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
-				   struct net_if *iface)
+static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb,
+			  uint32_t mgmt_event, struct net_if *iface)
 {
 	if ((mgmt_event & EVENT_MASK) != mgmt_event) {
 		return;
@@ -341,11 +339,7 @@ static void client_conn_handler(void *ptr1, void *ptr2, void *ptr3)
 	http_parser_init(&request.parser, HTTP_REQUEST);
 
 	while (1) {
-		/* Receive TCP fragment. This is a naive implementation that blocks indefinitely.
-		 * There is no timeout or mechanism to handle a client that just goes silent in the
-		 * middle of an HTTP request. Errors such as incomplete or wrongly-formatted
-		 * requests are not handled.
-		 */
+		/* Receive TCP fragment */
 		received = recv(request.socket, buf + offset, sizeof(buf) - offset, 0);
 		if (received == 0) {
 			/* Connection closed */
@@ -369,9 +363,7 @@ static void client_conn_handler(void *ptr1, void *ptr2, void *ptr3)
 			offset = 0;
 		}
 
-		/* If the HTTP request has been completely received, stop receiving data and
-		 * proceed to process the request.
-		 */
+		/* If HTTP request completely received, process the request */
 		if (request.received_all) {
 			handle_http_request(&request);
 			break;
@@ -397,7 +389,7 @@ static int get_free_slot(int *accepted)
 	return -1;
 }
 
-/* STEP 14 - Setup functions to handle incoming TCP connections */
+/* STEP 14.1 - Define a function to handle incoming TCP connections */
 static int process_tcp(int *sock, int *accepted)
 {
 	static int counter;
@@ -437,7 +429,7 @@ static int process_tcp(int *sock, int *accepted)
 	return 0;
 }
 
-/* Processing incoming IPv4 clients */
+/* STEP 14.2 - Define a function to process incoming IPv4 clients */
 static void process_tcp4(void)
 {
 	int ret;
@@ -489,7 +481,7 @@ int main(void)
 	/* Wait for the connection. */
 	k_sem_take(&run_app, K_FOREVER);
 
-	/* STEP 15.2 - Call the start_listener function */
+	/* STEP 15.2 - Start listening on the TCP socket */
 	start_listener();
 
 	(void)err;
