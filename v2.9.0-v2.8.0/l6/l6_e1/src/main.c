@@ -26,15 +26,8 @@ LOG_MODULE_REGISTER(Lesson6_Exercise1, LOG_LEVEL_INF);
 
 #define EVENT_MASK (NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED)
 
-#define HTTP_HOSTNAME "echo.thingy.rocks"
-#define HTTP_PORT     80
-
 #define RECV_BUF_SIZE  2048
 #define CLIENT_ID_SIZE 36
-
-static struct net_mgmt_event_callback mgmt_cb;
-static bool connected;
-static K_SEM_DEFINE(run_app, 0, 1);
 
 static char recv_buf[RECV_BUF_SIZE];
 static char client_id_buf[CLIENT_ID_SIZE + 2];
@@ -44,13 +37,18 @@ static int counter = 0;
 static int sock;
 static struct sockaddr_storage server;
 
-/* STEP 1 - Create two variables to keep track of the power save status and PUT/GET request. */
+static struct net_mgmt_event_callback mgmt_cb;
+static bool connected;
+static K_SEM_DEFINE(run_app, 0, 1);
+
+/* STEP 1 - Define variables for power save status and PUT/GET requests */
 
 
-/* STEP 5.1 - Create a variables to keep track of the power save wakeup mode. */
+/* STEP 6.1 - Define a variable for power save wakeup mode status */
 
-static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb,
-			  uint32_t mgmt_event, struct net_if *iface)
+
+static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
+				   struct net_if *iface)
 {
 	if ((mgmt_event & EVENT_MASK) != mgmt_event) {
 		return;
@@ -79,22 +77,19 @@ static int server_resolve(void)
 {
 	int err;
 	struct addrinfo *result;
-	struct addrinfo hints = {
-		.ai_family = AF_INET,
-		.ai_socktype = SOCK_STREAM
-	};
+	struct addrinfo hints = {.ai_family = AF_INET, .ai_socktype = SOCK_STREAM};
 
-	err = getaddrinfo(HTTP_HOSTNAME, STRINGIFY(HTTP_PORT), &hints, &result);
+	err = getaddrinfo(CONFIG_HTTP_SAMPLE_HOSTNAME, CONFIG_HTTP_SAMPLE_PORT, &hints, &result);
 	if (err != 0) {
-		LOG_INF("getaddrinfo failed, err: %d, %s", err, gai_strerror(err));
+		LOG_ERR("getaddrinfo failed, err: %d, %s", err, gai_strerror(err));
 		return -EIO;
 	}
 
 	if (result == NULL) {
-		LOG_INF("Error, address not found");
+		LOG_ERR("Error, address not found");
 		return -ENOENT;
 	}
-	
+
 	struct sockaddr_in *server4 = ((struct sockaddr_in *)&server);
 	server4->sin_addr.s_addr = ((struct sockaddr_in *)result->ai_addr)->sin_addr.s_addr;
 	server4->sin_family = AF_INET;
@@ -102,7 +97,7 @@ static int server_resolve(void)
 
 	char ipv4_addr[NET_IPV4_ADDR_LEN];
 	inet_ntop(AF_INET, &server4->sin_addr.s_addr, ipv4_addr, sizeof(ipv4_addr));
-	LOG_INF("IPv4 Address found %s", ipv4_addr);
+	LOG_INF("IPv4 address of HTTP server found %s", ipv4_addr);
 
 	freeaddrinfo(result);
 
@@ -127,10 +122,8 @@ static int server_connect(void)
 	return 0;
 }
 
-static void response_cb(struct http_response *rsp,
-                        enum http_final_call final_data,
-                        void *user_data)
-{	
+static void response_cb(struct http_response *rsp, enum http_final_call final_data, void *user_data)
+{
 	LOG_INF("Response status: %s", rsp->http_status);
 
 	if (rsp->body_frag_len > 0) {
@@ -138,15 +131,16 @@ static void response_cb(struct http_response *rsp,
 		strncpy(body_buf, rsp->body_frag_start, rsp->body_frag_len);
 		body_buf[rsp->body_frag_len] = '\0';
 		LOG_INF("Received: %s", body_buf);
-	} 
+	}
+
+	close(sock);
 }
 
-static void client_id_cb(struct http_response *rsp,
-                        enum http_final_call final_data,
-                        void *user_data)
+static void client_id_cb(struct http_response *rsp, enum http_final_call final_data,
+			 void *user_data)
 {
 	LOG_INF("Response status: %s", rsp->http_status);
-	
+
 	char client_id_buf_tmp[CLIENT_ID_SIZE + 1];
 	strncpy(client_id_buf_tmp, rsp->body_frag_start, CLIENT_ID_SIZE);
 	client_id_buf_tmp[CLIENT_ID_SIZE] = '\0';
@@ -154,14 +148,16 @@ static void client_id_cb(struct http_response *rsp,
 	strcat(client_id_buf, client_id_buf_tmp);
 
 	LOG_INF("Successfully acquired client ID: %s", client_id_buf);
-}
 
+	close(sock);
+}
 
 static int client_http_put(void)
 {
 	int err = 0;
 	int bytes_written;
 	const char *headers[] = {"Connection: close\r\n", NULL};
+
 	struct http_request req;
 	memset(&req, 0, sizeof(req));
 
@@ -171,10 +167,11 @@ static int client_http_put(void)
 		LOG_INF("Unable to write to buffer, err: %d", bytes_written);
 		return bytes_written;
 	}
+
 	req.header_fields = headers;
 	req.method = HTTP_PUT;
 	req.url = client_id_buf;
-	req.host = HTTP_HOSTNAME;
+	req.host = CONFIG_HTTP_SAMPLE_HOSTNAME;
 	req.protocol = "HTTP/1.1";
 	req.payload = buffer;
 	req.payload_len = bytes_written;
@@ -187,20 +184,22 @@ static int client_http_put(void)
 	if (err < 0) {
 		LOG_ERR("Failed to send HTTP PUT request %s, err: %d", buffer, err);
 	}
-	close(sock);
+
 	return err;
 }
 
 static int client_http_get(void)
 {
 	int err = 0;
-	struct http_request req;
 	const char *headers[] = {"Connection: close\r\n", NULL};
+
+	struct http_request req;
 	memset(&req, 0, sizeof(req));
+
 	req.header_fields = headers;
 	req.method = HTTP_GET;
 	req.url = client_id_buf;
-	req.host = HTTP_HOSTNAME;
+	req.host = CONFIG_HTTP_SAMPLE_HOSTNAME;
 	req.protocol = "HTTP/1.1";
 	req.response = response_cb;
 	req.recv_buf = recv_buf;
@@ -211,28 +210,32 @@ static int client_http_get(void)
 	if (err < 0) {
 		LOG_ERR("Failed to send HTTP GET request, err: %d", err);
 	}
-	close(sock);
+
 	return err;
 }
 
 static int client_get_new_id(void)
 {
 	int err = 0;
-	const char *headers[] = {"Connection: close\r\n", NULL};
+
 	struct http_request req;
 	memset(&req, 0, sizeof(req));
 
+	const char *headers[] = {"Connection: close\r\n", NULL};
 	req.header_fields = headers;
 	req.method = HTTP_POST;
 	req.url = "/new";
-	req.host = HTTP_HOSTNAME;
+	req.host = CONFIG_HTTP_SAMPLE_HOSTNAME;
 	req.protocol = "HTTP/1.1";
 	req.response = client_id_cb;
 	req.recv_buf = recv_buf;
 	req.recv_buf_len = sizeof(recv_buf);
 
+	LOG_INF("HTTP POST request");
 	err = http_client_req(sock, &req, 5000, NULL);
-	close(sock);
+	if (err < 0) {
+		LOG_ERR("Failed to send HTTP POST request, err: %d", err);
+	}
 	return err;
 }
 
@@ -240,22 +243,17 @@ int wifi_set_power_state()
 {
 	struct net_if *iface = net_if_get_first_wifi();
 
-	/* STEP 2.1 - Define the Wi-Fi power save parameters struct wifi_ps_params. */
-	
+	/* STEP 2.1 - Define the Wi-Fi power save parameters structure */
 
-	/* STEP 2.2 - Create an if statement to check if power saving is currently enabled.
-	 * If it is not currently enabled, set the wifi_ps_params enabled parameter to WIFI_PS_ENABLED to enable power saving.
-	 * If it is enabled, set enabled to WIFI_PS_DISABLED to disable power saving. */
-	
 
-	/* STEP 2.3 - Send the power save request with net_mgmt. */
-	
-	
-	LOG_INF("Set power save: %s", params.enabled ? "enable" : "disable");
-	
-	/* STEP 2.4 - Toggle the value of nrf_wifi_ps_enabled to indicate the new power save status. */
-	
-	
+	/* STEP 2.2 - Check if power saving is currently enabled */
+
+
+	/* STEP 2.3 - Send the power save request */
+
+
+	/* STEP 2.4 - Toggle the power save status */
+
 	return 0;
 }
 
@@ -263,22 +261,20 @@ int wifi_set_ps_wakeup_mode()
 {
 	struct net_if *iface = net_if_get_default();
 
-	/* STEP 5.2 - Define a new wifi_ps_params struct for the wakeup mode request. */
-	
-
-	/* STEP 5.3 - Create an if statement to check the wakeup mode.
-	 * If nrf_wifi_ps_wakeup_mode is true, the wakeup mode is listen interval and we want to change it to DTIM.
-	 * If nrf_wifi_ps_wakeup_mode is false, the wakeup mode is DTIM and we want to change it to listen interval. */
-	
-
-	/* STEP 5.4 - Set the request type to wakeup mode. */
-	
-
-	/* STEP 5.5 - Send the wakeup mode request with net_mgmt like we did in STEP 2. */
+	/* STEP 6.2 - Define the Wi-Fi power save parameters structure */
 
 
-	/* STEP 5.6 - Toggle the value of nrf_wifi_ps_wakeup_mode to indicate the wakeup mode. */
-	
+	/* STEP 6.3 - Check and toggle the current wakeup mode */
+
+
+	/* STEP 6.4 - Set the request type to wakeup mode. */
+
+
+	/* STEP 6.5 - Send the wakeup mode request */
+
+
+	/* STEP 6.6 - Toggle the wakeup mode status */
+
 
 	return 0;
 }
@@ -286,27 +282,24 @@ int wifi_set_ps_wakeup_mode()
 static void button_handler(uint32_t button_state, uint32_t has_changed)
 {
 	uint32_t button = button_state & has_changed;
-	
-	
-	if (button & DK_BTN1_MSK) {
-		/* STEP 3.1 - Call wifi_set_power_state() when button 1 is pressed. */
 
-		/* STEP 5.7 - Modify button_handler to call wifi_set_ps_wakeup_mode() instead of wifi_set_power_state() when button 1 is pressed. */
+	if (button & DK_BTN1_MSK) {
+		/* STEP 3.1 - When button 1 is pressed, enable or disable power save mode */
+
+		/* STEP 6.7 - When button 1 is pressed, enable or disable wakeup mode */
 		
 	}
 
 	
 	if (button & DK_BTN2_MSK) {
-		/* STEP 3.2 - When button 2 is pressed, if http_put is true, call client_http_put() and increase the counter variable with 1. 
-	 	* If http_put is false, call client_http_get() instead. */
-
-		/* STEP 3.3 - Toggle the value of http_put. */
+		/* STEP 3.2 - When button 2 is pressed, alternate sending a PUT or GET request */
 		
 	}
 }
 
 int main(void)
 {
+
 	if (dk_leds_init() != 0) {
 		LOG_ERR("Failed to initialize the LED library");
 	}
@@ -329,10 +322,12 @@ int main(void)
 		return 0;
 	}
 
+	LOG_INF("Connecting to %s:%s", CONFIG_HTTP_SAMPLE_HOSTNAME, CONFIG_HTTP_SAMPLE_PORT);
 	if (server_connect() != 0) {
-		LOG_ERR("Failed to initialize client");
+		LOG_ERR("Failed to connect to server");
 		return 0;
 	}
+
 	LOG_INF("Successfully connected to HTTP server");
 
 	if (client_get_new_id() < 0) {
