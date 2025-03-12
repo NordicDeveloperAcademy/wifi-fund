@@ -218,7 +218,6 @@ static void button_handler(uint32_t button_state, uint32_t has_changed)
 
 int main(void)
 {
-	int received;
 
 	if (dk_leds_init() != 0) {
 		LOG_ERR("Failed to initialize the LED library");
