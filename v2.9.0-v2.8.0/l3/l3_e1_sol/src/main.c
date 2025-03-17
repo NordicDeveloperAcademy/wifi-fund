@@ -171,7 +171,7 @@ int main(void)
 	}
 
 	if (server_connect() != 0) {
-		LOG_INF("Failed to initialize client");
+		LOG_INF("Failed to connect to server");
 		return 0;
 	}
 
