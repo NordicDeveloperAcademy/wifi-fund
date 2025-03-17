@@ -1,0 +1,16 @@
+#
+# Copyright (c) 2025 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menu "Wi-Fi Fund Lesson 5 Exercise 1"
+
+# STEP 2.1 - Define the Kconfig for the server hostname
+
+
+# STEP 2.2 - Define the Kconfig for the server port
+
+endmenu
+
+source "Kconfig.zephyr"

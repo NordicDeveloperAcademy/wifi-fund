@@ -1,0 +1,20 @@
+#
+# Copyright (c) 2025 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menu "Wi-Fi Fund Lesson 5 Exercise 2"
+
+config HTTP_SAMPLE_HOSTNAME
+	string "HTTP server hostname"
+	default "rest.nordicsemi.academy"
+
+# STEP 3 - Change the default port if TLS is enabled
+config HTTP_SAMPLE_PORT
+    string "HTTP server port"
+    default "80"
+
+endmenu
+
+source "Kconfig.zephyr"
