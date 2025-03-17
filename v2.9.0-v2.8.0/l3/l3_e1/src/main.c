@@ -14,10 +14,8 @@
 
 #include <dk_buttons_and_leds.h>
 
-#include <zephyr/net/wifi.h>
-#include <zephyr/net/wifi_mgmt.h>
 #include <zephyr/net/net_mgmt.h>
-#include <net/wifi_mgmt_ext.h>
+#include <zephyr/net/wifi_mgmt.h>
 #include <net/wifi_credentials.h>
 
 /* STEP 2 - Include the header file for the socket API */ 
