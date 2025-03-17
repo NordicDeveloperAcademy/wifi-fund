@@ -17,7 +17,7 @@
 /* STEP 3 - Include the necessary header files */
 
 
-/* STEP 12.4 - Include the header file for the Wi-FI credentials library */
+/* STEP 13.4 - Include the header file for the Wi-FI credentials library */
 
 
 LOG_MODULE_REGISTER(Lesson2_Exercise2, LOG_LEVEL_INF);
