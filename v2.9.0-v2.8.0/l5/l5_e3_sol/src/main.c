@@ -18,10 +18,8 @@
 #include <zephyr/net/net_config.h>
 #include <zephyr/net/net_ip.h>
 #include <zephyr/net/dns_sd.h>
-#include <zephyr/net/wifi.h>
-#include <zephyr/net/wifi_mgmt.h>
 #include <zephyr/net/net_mgmt.h>
-#include <net/wifi_mgmt_ext.h>
+#include <zephyr/net/wifi_mgmt.h>
 #include <net/wifi_credentials.h>
 #include <zephyr/net/socket.h>
 #include <zephyr/net/http/client.h>
