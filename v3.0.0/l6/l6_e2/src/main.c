@@ -16,7 +16,7 @@
 
 #include <zephyr/net/net_mgmt.h>
 #include <zephyr/net/wifi_mgmt.h>
-#include <net/wifi_credentials.h>
+#include <zephyr/net/wifi_credentials.h>
 #include <zephyr/net/socket.h>
 
 LOG_MODULE_REGISTER(Lesson6_Exercise2, LOG_LEVEL_INF);

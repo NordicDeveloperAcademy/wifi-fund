@@ -17,7 +17,7 @@
 /* STEP 3 - Include the necessary header files */
 #include <zephyr/net/net_mgmt.h>
 #include <zephyr/net/wifi_mgmt.h>
-#include <net/wifi_credentials.h>
+#include <zephyr/net/wifi_credentials.h>
 
 LOG_MODULE_REGISTER(Lesson2_Exercise2, LOG_LEVEL_INF);
 

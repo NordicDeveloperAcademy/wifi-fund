@@ -18,7 +18,7 @@
 #include <zephyr/net/wifi_mgmt.h>
 #include <zephyr/net/net_mgmt.h>
 #include <net/wifi_mgmt_ext.h>
-#include <net/wifi_credentials.h>
+#include <zephyr/net/wifi_credentials.h>
 
 /* STEP 2 - Include the header files for Bluetooth LE */
 #include <zephyr/bluetooth/bluetooth.h>

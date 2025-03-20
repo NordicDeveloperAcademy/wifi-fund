@@ -16,7 +16,7 @@
 
 #include <zephyr/net/net_mgmt.h>
 #include <zephyr/net/wifi_mgmt.h>
-#include <net/wifi_credentials.h>
+#include <zephyr/net/wifi_credentials.h>
 #include <zephyr/net/socket.h>
 
 /* STEP 2 - Include the header files for the zperf API and nrfx clock */ 
