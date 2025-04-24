@@ -1,3 +1,0 @@
-/ {
-    /delete-node/ nrf-gpio-forwarder;
-};
