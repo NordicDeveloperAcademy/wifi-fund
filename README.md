@@ -5,9 +5,9 @@ The Wi-Fi Fundamentals course is an online, self-paced course that focuses on te
 
 Upon completion of the course, participants will have a thorough understanding of the Wi-Fi protocol and its layers, as well as knowledge of available APIs in the nRF Connect SDK, which is based on the Zephyr RTOS. Additionally, participants will have gained practical experience in configuring Wi-Fi connections and developing Wi-Fi applications.
 
-This repository contains the exercise code base and solutions. Make sure to select the directory that corresponds with the nRF Connect SDK version of your choosing:
+This repository contains the exercise code base and solutions. Make sure to select the branch that corresponds with the nRF Connect SDK version of your choosing:
 
- - <code>v2.9.0-v2.8.0</code>: For nRF Connect SDK versions v2.9.0 to v2.8.0
+ - <code>main</code>: For nRF Connect SDK versions v3.0.0
  - <code>v2.7.0-v2.6.1</code>: For nRF Connect SDK versions v2.7.0 to v2.6.1
  - <code>v2.6.0-v2.5.0</code>: For nRF Connect SDK versions v2.6.0 to v2.5.0
 
