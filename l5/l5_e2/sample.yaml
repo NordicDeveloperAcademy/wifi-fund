@@ -1,0 +1,20 @@
+sample:
+  description: Wi-Fi Fundamentals Course by Nordic Developer Academy (https://academy.nordicsemi.com/)
+  name: Wi-Fi Fundamentals Course - Lesson 5 Exercise 2 
+  
+common: 
+    sysbuild: true
+    build_only: true
+    skip: true
+    platform_exclude:
+      - native_sim
+    
+tests:
+  wifi_fund.l5.e2.nrf5340dk: 
+    extra_args: SHIELD=nrf7002ek
+    integration_platforms: 
+    - nrf5340dk/nrf5340/cpuapp/ns
+  
+  wifi_fund.l5.e2.nrf7002dk:
+    integration_platforms: 
+    - nrf7002dk/nrf5340/cpuapp/ns
