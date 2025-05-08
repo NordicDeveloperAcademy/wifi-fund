@@ -181,9 +181,9 @@ static void handle_http_request(struct http_req *request)
 
 		/* Handle GET requests to the "led" resource */
 		if ((ret == 1) && (led_id > 0) && (led_id < (ARRAY_SIZE(led_states) + 1))) {
-			char body[2];
+			char body[4];
 			size_t led_index = led_id - 1;
-
+						
 			(void)snprintk(body, sizeof(body), "%d", led_states[led_index]);
 
 			(void)snprintk(dynamic_response_buf, sizeof(dynamic_response_buf),
