@@ -121,7 +121,7 @@ static int server_connect(void)
 	return 0;
 }
 
-static void response_cb(struct http_response *rsp, enum http_final_call final_data, void *user_data)
+static int response_cb(struct http_response *rsp, enum http_final_call final_data, void *user_data)
 {
 	LOG_INF("Response status: %s", rsp->http_status);
 
@@ -133,9 +133,10 @@ static void response_cb(struct http_response *rsp, enum http_final_call final_da
 	}
 
 	close(sock);
+	return 0;
 }
 
-static void client_id_cb(struct http_response *rsp, enum http_final_call final_data,
+static int client_id_cb(struct http_response *rsp, enum http_final_call final_data,
 			 void *user_data)
 {
 	LOG_INF("Response status: %s", rsp->http_status);
@@ -149,6 +150,7 @@ static void client_id_cb(struct http_response *rsp, enum http_final_call final_d
 	LOG_INF("Successfully acquired client ID: %s", client_id_buf);
 
 	close(sock);
+	return 0;
 }
 
 static int client_http_put(void)

@@ -119,7 +119,7 @@ static int server_connect(void)
 	return 0;
 }
 
-static void response_cb(struct http_response *rsp, enum http_final_call final_data, void *user_data)
+static int response_cb(struct http_response *rsp, enum http_final_call final_data, void *user_data)
 {
 	/* STEP 9 - Define the callback function to print the body */
 	LOG_INF("Response status: %s", rsp->http_status);
@@ -133,9 +133,10 @@ static void response_cb(struct http_response *rsp, enum http_final_call final_da
 
 	LOG_INF("Closing socket: %d", sock);
 	close(sock);
+	return 0;
 }
 
-static void client_id_cb(struct http_response *rsp, enum http_final_call final_data,
+static int client_id_cb(struct http_response *rsp, enum http_final_call final_data,
 			 void *user_data)
 {
 	/* STEP 6.1 - Log the HTTP response status */
@@ -153,6 +154,7 @@ static void client_id_cb(struct http_response *rsp, enum http_final_call final_d
 	/* STEP 6.3 - Close the socket */
 	LOG_INF("Closing socket: %d", sock);
 	close(sock);
+	return 0;
 }
 
 static int client_http_put(void)

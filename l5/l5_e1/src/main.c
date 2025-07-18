@@ -116,13 +116,13 @@ static int server_connect(void)
 	return 0;
 }
 
-static void response_cb(struct http_response *rsp, enum http_final_call final_data, void *user_data)
+static int response_cb(struct http_response *rsp, enum http_final_call final_data, void *user_data)
 {
 	/* STEP 9 - Define the callback function to print the body */
 
 }
 
-static void client_id_cb(struct http_response *rsp, enum http_final_call final_data,
+static int client_id_cb(struct http_response *rsp, enum http_final_call final_data,
 			 void *user_data)
 {
 	/* STEP 6.1 - Log the HTTP response status */
