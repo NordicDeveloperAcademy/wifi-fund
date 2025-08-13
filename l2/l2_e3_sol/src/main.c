@@ -26,6 +26,7 @@
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/gatt.h>
+#include <net/wifi_prov_core/wifi_prov_core.h>
 #include <bluetooth/services/wifi_provisioning.h>
 
 LOG_MODULE_REGISTER(Lesson2_Exercise3, LOG_LEVEL_INF);
@@ -113,7 +114,7 @@ static void update_wifi_status_in_adv(void)
 	prov_svc_data[ADV_DATA_VERSION_IDX] = PROV_SVC_VER;
 
 	/* STEP 5.2 - Update the provisioning state */
-	if (!bt_wifi_prov_state_get()) {
+	if (!wifi_prov_state_get()) {
 		prov_svc_data[ADV_DATA_FLAG_IDX] &= ~ADV_DATA_FLAG_PROV_STATUS_BIT;
 	} else {
 		prov_svc_data[ADV_DATA_FLAG_IDX] |= ADV_DATA_FLAG_PROV_STATUS_BIT;
@@ -308,7 +309,7 @@ int main(void)
 	LOG_INF("Bluetooth initialized.\n");
 
 	/* STEP 9 - Enable the Bluetooth Wi-Fi Provisioning Service */
-	err = bt_wifi_prov_init();
+	err = wifi_prov_init();
 	if (err == 0) {
 		LOG_INF("Wi-Fi provisioning service starts successfully.\n");
 	} else {
