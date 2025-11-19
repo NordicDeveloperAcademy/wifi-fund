@@ -40,7 +40,7 @@ static struct net_mgmt_event_callback mgmt_cb;
 static bool connected;
 static K_SEM_DEFINE(run_app, 0, 1);
 
-static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
+static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint64_t mgmt_event,
 				   struct net_if *iface)
 {
 	if ((mgmt_event & EVENT_MASK) != mgmt_event) {
