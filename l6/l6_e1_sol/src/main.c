@@ -46,7 +46,7 @@ bool http_put = 1;
 /* STEP 6.1 - Define a variable for power save wakeup mode status */
 bool nrf_wifi_ps_wakeup_mode = 0;
 
-static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
+static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint64_t mgmt_event,
 				   struct net_if *iface)
 {
 	if ((mgmt_event & EVENT_MASK) != mgmt_event) {

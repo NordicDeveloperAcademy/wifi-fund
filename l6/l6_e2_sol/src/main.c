@@ -103,7 +103,7 @@ static void handle_wifi_twt_event(struct net_mgmt_event_callback *cb)
 	}
 }
 
-static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
+static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint64_t mgmt_event,
 				   struct net_if *iface)
 {
 	if ((mgmt_event & EVENT_MASK) != mgmt_event) {
@@ -129,7 +129,7 @@ static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint32_t 
 	}
 }
 
-static void twt_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
+static void twt_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint64_t mgmt_event,
 				   struct net_if *iface)
 {
 	switch (mgmt_event) {

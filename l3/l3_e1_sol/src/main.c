@@ -44,7 +44,7 @@ static struct sockaddr_storage server;
 /* STEP 4.2 - Declare the buffer for receiving from server */
 static uint8_t recv_buf[MESSAGE_SIZE];
 
-static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
+static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint64_t mgmt_event,
 				   struct net_if *iface)
 {
 	if ((mgmt_event & EVENT_MASK) != mgmt_event) {
