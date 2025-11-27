@@ -5,17 +5,18 @@ sample:
 common: 
     sysbuild: true
     build_only: true
-    platform_exclude:
-      - native_sim
-    
+
 tests:
   wifi_fund.l6.e1_sol.nrf5340dk: 
     extra_args: SHIELD=nrf7002ek
     integration_platforms: 
-    - nrf5340dk/nrf5340/cpuapp/ns
-
+      - nrf5340dk/nrf5340/cpuapp/ns
+    platform_allow: 
+      - nrf5340dk/nrf5340/cpuapp/ns
   
   wifi_fund.l6.e1_sol.nrf7002dk:
     integration_platforms: 
-    - nrf7002dk/nrf5340/cpuapp/ns
+      - nrf7002dk/nrf5340/cpuapp/ns
+    platform_allow: 
+      - nrf7002dk/nrf5340/cpuapp/ns
  
