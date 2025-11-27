@@ -12,7 +12,7 @@ tests:
     integration_platforms: 
       - nrf5340dk/nrf5340/cpuapp/ns
     platform_allow:
-      - nrf5340dk/nrf5340/cpuapp/ns      
+      - nrf5340dk/nrf5340/cpuapp/ns
 
   wifi_fund.l4.e1_sol.nrf7002dk:
     integration_platforms: 
