@@ -205,7 +205,7 @@ static void handle_http_request(struct http_req *request)
 	while (len) {
 		ssize_t out_len;
 
-		out_len = send(request->socket, resp_ptr, len, 0);
+		out_len = zsock_send(request->socket, resp_ptr, len, 0);
 
 		if (out_len < 0) {
 			LOG_ERR("Error while sending: %d", -errno);
@@ -294,20 +294,20 @@ static int setup_server(int *sock, struct sockaddr *bind_addr, socklen_t bind_ad
 {
 	int ret;
 
-	*sock = socket(bind_addr->sa_family, SOCK_STREAM, IPPROTO_TCP);
+	*sock = zsock_socket(bind_addr->sa_family, SOCK_STREAM, IPPROTO_TCP);
 
 	if (*sock < 0) {
 		LOG_ERR("Failed to create TCP socket: %d", errno);
 		return -errno;
 	}
 
-	ret = bind(*sock, bind_addr, bind_addrlen);
+	ret = zsock_bind(*sock, bind_addr, bind_addrlen);
 	if (ret < 0) {
 		LOG_ERR("Failed to bind TCP socket %d", errno);
 		return -errno;
 	}
 
-	ret = listen(*sock, MAX_CLIENT_QUEUE);
+	ret = zsock_listen(*sock, MAX_CLIENT_QUEUE);
 	if (ret < 0) {
 		LOG_ERR("Failed to listen on TCP socket %d", errno);
 		ret = -errno;
@@ -335,7 +335,7 @@ static void client_conn_handler(void *ptr1, void *ptr2, void *ptr3)
 
 	while (1) {
 		/* Receive TCP fragment */
-		received = recv(request.socket, buf + offset, sizeof(buf) - offset, 0);
+		received = zsock_recv(request.socket, buf + offset, sizeof(buf) - offset, 0);
 		if (received == 0) {
 			/* Connection closed */
 			LOG_INF("[%d] Connection closed by peer", request.socket);
@@ -365,7 +365,7 @@ static void client_conn_handler(void *ptr1, void *ptr2, void *ptr3)
 		}
 	};
 
-	(void)close(request.socket);
+	(void)zsock_close(request.socket);
 
 	*sock = -1;
 	*in_use = NULL;
@@ -394,7 +394,7 @@ static int process_tcp(int *sock, int *accepted)
 	socklen_t client_addr_len = sizeof(client_addr);
 	char addr_str[INET_ADDRSTRLEN];
 
-	client = accept(*sock, (struct sockaddr *)&client_addr, &client_addr_len);
+	client = zsock_accept(*sock, (struct sockaddr *)&client_addr, &client_addr_len);
 	if (client < 0) {
 		LOG_ERR("Error in accept %d, stopping server", -errno);
 		return -errno;
@@ -403,7 +403,7 @@ static int process_tcp(int *sock, int *accepted)
 	slot = get_free_slot(accepted);
 	if (slot < 0 || slot >= MAX_CLIENT_QUEUE) {
 		LOG_ERR("Cannot accept more connections");
-		close(client);
+		zsock_close(client);
 		return 0;
 	}
 

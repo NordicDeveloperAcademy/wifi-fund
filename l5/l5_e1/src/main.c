@@ -69,12 +69,12 @@ static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint64_t 
 static int server_resolve(void)
 {
 	int err;
-	struct addrinfo *result;
-	struct addrinfo hints = {.ai_family = AF_INET, .ai_socktype = SOCK_STREAM};
+	struct zsock_addrinfo *result;
+	struct zsock_addrinfo hints = {.ai_family = AF_INET, .ai_socktype = SOCK_STREAM};
 
-	err = getaddrinfo(CONFIG_HTTP_SAMPLE_HOSTNAME, CONFIG_HTTP_SAMPLE_PORT, &hints, &result);
+	err = zsock_getaddrinfo(CONFIG_HTTP_SAMPLE_HOSTNAME, CONFIG_HTTP_SAMPLE_PORT, &hints, &result);
 	if (err != 0) {
-		LOG_ERR("getaddrinfo failed, err: %d, %s", err, gai_strerror(err));
+		LOG_ERR("getaddrinfo failed, err: %d, %s", err, zsock_gai_strerror(err));
 		return -EIO;
 	}
 
@@ -89,10 +89,10 @@ static int server_resolve(void)
 	server4->sin_port = ((struct sockaddr_in *)result->ai_addr)->sin_port;
 
 	char ipv4_addr[NET_IPV4_ADDR_LEN];
-	inet_ntop(AF_INET, &server4->sin_addr.s_addr, ipv4_addr, sizeof(ipv4_addr));
+	zsock_inet_ntop(AF_INET, &server4->sin_addr.s_addr, ipv4_addr, sizeof(ipv4_addr));
 	LOG_INF("IPv4 address of HTTP server found %s", ipv4_addr);
 
-	freeaddrinfo(result);
+	zsock_freeaddrinfo(result);
 
 	return 0;
 }
@@ -100,13 +100,13 @@ static int server_resolve(void)
 static int server_connect(void)
 {
 	int err;
-	sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	sock = zsock_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (sock < 0) {
 		LOG_ERR("Failed to create socket, err: %d, %s", errno, strerror(errno));
 		return -errno;
 	}
 
-	err = connect(sock, (struct sockaddr *)&server, sizeof(struct sockaddr_in));
+	err = zsock_connect(sock, (struct sockaddr *)&server, sizeof(struct sockaddr_in));
 	if (err < 0) {
 		LOG_ERR("Connecting to server failed, err: %d, %s", errno, strerror(errno));
 		return -errno;
