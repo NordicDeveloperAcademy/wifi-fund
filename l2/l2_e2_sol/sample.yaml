@@ -5,8 +5,6 @@ sample:
 common: 
     sysbuild: true
     build_only: true
-    platform_exclude:
-      - native_sim
     
 tests:
   wifi_fund.l2.e2_sol.nrf5340dk: 
@@ -14,9 +12,15 @@ tests:
     integration_platforms: 
     - nrf5340dk/nrf5340/cpuapp/ns
     - nrf5340dk/nrf5340/cpuapp
+    platform_allow:
+      - nrf5340dk/nrf5340/cpuapp/ns
+      - nrf5340dk/nrf5340/cpuapp
   
   wifi_fund.l2.e2_sol.nrf7002dk:
     integration_platforms: 
     - nrf7002dk/nrf5340/cpuapp/ns
     - nrf7002dk/nrf5340/cpuapp    
+    platform_allow:
+      - nrf7002dk/nrf5340/cpuapp/ns
+      - nrf7002dk/nrf5340/cpuapp
   
