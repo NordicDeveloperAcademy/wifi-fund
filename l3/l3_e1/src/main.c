@@ -134,6 +134,6 @@ int main(void)
 
 			
 	}
-	close(sock);
+	zsock_close(sock);
 	return 0;
 }

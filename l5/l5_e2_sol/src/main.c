@@ -81,12 +81,12 @@ static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint64_t 
 static int server_resolve(void)
 {
 	int err;
-	struct addrinfo *result;
-	struct addrinfo hints = {.ai_family = AF_INET, .ai_socktype = SOCK_STREAM};
+	struct zsock_addrinfo *result;
+	struct zsock_addrinfo hints = {.ai_family = AF_INET, .ai_socktype = SOCK_STREAM};
 
-	err = getaddrinfo(CONFIG_HTTP_SAMPLE_HOSTNAME, CONFIG_HTTP_SAMPLE_PORT, &hints, &result);
+	err = zsock_getaddrinfo(CONFIG_HTTP_SAMPLE_HOSTNAME, CONFIG_HTTP_SAMPLE_PORT, &hints, &result);
 	if (err != 0) {
-		LOG_ERR("getaddrinfo failed, err: %d, %s", err, gai_strerror(err));
+		LOG_ERR("getaddrinfo failed, err: %d, %s", err, zsock_gai_strerror(err));
 		return -EIO;
 	}
 
@@ -101,10 +101,10 @@ static int server_resolve(void)
 	server4->sin_port = ((struct sockaddr_in *)result->ai_addr)->sin_port;
 
 	char ipv4_addr[NET_IPV4_ADDR_LEN];
-	inet_ntop(AF_INET, &server4->sin_addr.s_addr, ipv4_addr, sizeof(ipv4_addr));
+	zsock_inet_ntop(AF_INET, &server4->sin_addr.s_addr, ipv4_addr, sizeof(ipv4_addr));
 	LOG_INF("IPv4 address of HTTP server found %s", ipv4_addr);
 
-	freeaddrinfo(result);
+	zsock_freeaddrinfo(result);
 
 	return 0;
 }
@@ -126,7 +126,7 @@ static int setup_credentials(void)
 static int server_connect(void)
 {
 	int err;
-	sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TLS_1_2);
+	sock = zsock_socket(AF_INET, SOCK_STREAM, IPPROTO_TLS_1_2);
 	if (sock < 0) {
 		LOG_ERR("Failed to set up HTTPS socket, err: %d, %s", errno, strerror(errno));
 		return -errno;
@@ -136,21 +136,21 @@ static int server_connect(void)
 	sec_tag_t sec_tag_opt[] = {
 		HTTP_TLS_SEC_TAG,
 	};
-	err = setsockopt(sock, SOL_TLS, TLS_SEC_TAG_LIST, sec_tag_opt, sizeof(sec_tag_opt));
+	err = zsock_setsockopt(sock, SOL_TLS, TLS_SEC_TAG_LIST, sec_tag_opt, sizeof(sec_tag_opt));
 	if (err < 0) {
 		LOG_ERR("Failed to set TLS security TAG list, err: %d", errno);
-		(void)close(sock);
+		(void)zsock_close(sock);
 		return -errno;
 	}
 	/* STEP 5.2 - Configure the socket with the hostname of the HTTP server */
-	err = setsockopt(sock, SOL_TLS, TLS_HOSTNAME, CONFIG_HTTP_SAMPLE_HOSTNAME, sizeof(CONFIG_HTTP_SAMPLE_HOSTNAME));
+	err = zsock_setsockopt(sock, SOL_TLS, TLS_HOSTNAME, CONFIG_HTTP_SAMPLE_HOSTNAME, sizeof(CONFIG_HTTP_SAMPLE_HOSTNAME));
 	if (err < 0) {
 		LOG_ERR("Failed to set TLS_HOSTNAME option. Err: %d", errno);
-		(void)close(sock);
+		(void)zsock_close(sock);
 		return -errno;
 	}
 
-	err = connect(sock, (struct sockaddr *)&server, sizeof(struct sockaddr_in));
+	err = zsock_connect(sock, (struct sockaddr *)&server, sizeof(struct sockaddr_in));
 	if (err < 0) {
 		LOG_ERR("Connecting to server failed, err: %d, %s", errno, strerror(errno));
 		return -errno;
@@ -172,7 +172,7 @@ static int response_cb(struct http_response *rsp, enum http_final_call final_dat
 	}
 
 	LOG_INF("Closing socket: %d", sock);
-	close(sock);
+	zsock_close(sock);
 	return 0;
 }
 
@@ -189,7 +189,7 @@ static int client_id_cb(struct http_response *rsp, enum http_final_call final_da
 
 	LOG_INF("Successfully acquired client ID: %s", client_id_buf);
 	LOG_INF("Closing socket: %d", sock);
-	close(sock);
+	zsock_close(sock);
 	return 0;
 }
 
