@@ -23,4 +23,4 @@ tests:
     platform_allow:
       - nrf7002dk/nrf5340/cpuapp/ns
       - nrf7002dk/nrf5340/cpuapp
-    - nrf7002dk/nrf5340/cpuapp    
+      - nrf7002dk/nrf5340/cpuapp    
