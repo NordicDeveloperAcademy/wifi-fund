@@ -199,20 +199,20 @@ static int server_connect(void)
 	server.sin_family = AF_INET;
 	server.sin_port = htons(SERVER_PORT);
 
-	err = inet_pton(AF_INET, SERVER_IPV4_ADDR, &server.sin_addr);
+	err = zsock_inet_pton(AF_INET, SERVER_IPV4_ADDR, &server.sin_addr);
 	if (err <= 0) {
 		LOG_ERR("Invalid address, err: %d, %s", errno, strerror(errno));
-		close(sock);
+		zsock_close(sock);
 		return -errno;
 	}
 
-	sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	sock = zsock_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if (sock < 0) {
 		LOG_ERR("Failed to create socket, err: %d, %s", errno, strerror(errno));
 		return -errno;
 	}
 
-	err = connect(sock, (struct sockaddr *)&server, sizeof(server));
+	err = zsock_connect(sock, (struct sockaddr *)&server, sizeof(server));
 	if (err < 0) {
 		LOG_ERR("Connecting to server failed, err: %d, %s", errno, strerror(errno));
 		return -errno;
@@ -233,7 +233,7 @@ int send_packet()
 		return bytes_written;
 	}
 
-	err = sendto(sock, &buffer, SSTRLEN(buffer), 0, (struct sockaddr *)&server, sizeof(server));
+	err = zsock_sendto(sock, &buffer, SSTRLEN(buffer), 0, (struct sockaddr *)&server, sizeof(server));
 	if (err < 0) {
 		LOG_ERR("Failed to send message, err: %d, %s", errno, strerror(errno));
 		return -errno;
@@ -249,7 +249,7 @@ int receive_packet()
 
 	socklen_t addr_len;
 	addr_len = sizeof(server);
-	received = recvfrom(sock, recv_buf, sizeof(recv_buf) - 1, 0, (struct sockaddr *)&server,
+	received = zsock_recvfrom(sock, recv_buf, sizeof(recv_buf) - 1, 0, (struct sockaddr *)&server,
 			    &addr_len);
 
 	if (received <= 0) {
@@ -318,6 +318,6 @@ int main(void)
 			receive_packet();
 		}
 	}
-	close(sock);
+	zsock_close(sock);
 	return 0;
 }
