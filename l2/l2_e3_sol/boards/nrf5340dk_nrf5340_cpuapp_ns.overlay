@@ -1,5 +1,5 @@
 / {
-    /delete-node/ nrf-gpio-forwarder;
+	/delete-node/ nrf-gpio-forwarder;
 };
 
 /*
@@ -14,7 +14,6 @@
 /delete-node/ &tfm_its_partition;
 /delete-node/ &tfm_otp_partition;
 /delete-node/ &tfm_ps_partition;
-/delete-node/ &storage_partition;
 
 &flash0 {
 	partitions {
