@@ -8,14 +8,14 @@ common:
     skip: true
     
 tests:
-  wifi_fund.l3.e2_sol.nrf5340dk: 
+  wifi_fund.l3.e2.nrf5340dk: 
     extra_args: SHIELD=nrf7002ek
     integration_platforms: 
     - nrf5340dk/nrf5340/cpuapp
     platform_allow:
       - nrf5340dk/nrf5340/cpuapp
   
-  wifi_fund.l3.e2_sol.nrf7002dk:
+  wifi_fund.l3.e2.nrf7002dk:
     integration_platforms: 
       - nrf7002dk/nrf5340/cpuapp
     platform_allow:
