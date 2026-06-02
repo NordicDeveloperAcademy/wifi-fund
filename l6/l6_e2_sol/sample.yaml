@@ -11,6 +11,7 @@ tests:
     extra_args: SHIELD=nrf7002ek
     integration_platforms: 
     - nrf5340dk/nrf5340/cpuapp/ns
+    - nrf5340dk/nrf5340/cpuapp
     platform_allow:
       - nrf5340dk/nrf5340/cpuapp/ns
       - nrf5340dk/nrf5340/cpuapp
@@ -18,6 +19,7 @@ tests:
   wifi_fund.l6.e2_sol.nrf7002dk:
     integration_platforms: 
     - nrf7002dk/nrf5340/cpuapp/ns
+    - nrf7002dk/nrf5340/cpuapp
     platform_allow:
       - nrf7002dk/nrf5340/cpuapp/ns
       - nrf7002dk/nrf5340/cpuapp
