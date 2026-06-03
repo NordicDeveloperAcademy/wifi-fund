@@ -13,7 +13,6 @@ tests:
     - nrf5340dk/nrf5340/cpuapp/ns
     platform_allow:
       - nrf5340dk/nrf5340/cpuapp/ns
-      - nrf5340dk/nrf5340/cpuapp
 
   
   wifi_fund.l6.e1_sol.nrf7002dk:
@@ -21,5 +20,3 @@ tests:
     - nrf7002dk/nrf5340/cpuapp/ns
     platform_allow:
       - nrf7002dk/nrf5340/cpuapp/ns
-      - nrf7002dk/nrf5340/cpuapp
- 
