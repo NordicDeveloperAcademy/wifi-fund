@@ -16,13 +16,13 @@
 		slot0_s_partition: partition@0 {
 			compatible = "zephyr,mapped-partition";
 			label = "image-0-secure";
-			reg = <0x0 0x40000>;
+			reg = <0x0 0x20000>;
 		};
 
-		slot0_ns_partition: partition@40000 {
+		slot0_ns_partition: partition@20000 {
 			compatible = "zephyr,mapped-partition";
 			label = "image-0-nonsecure";
-			reg = <0x40000 0xb4000>;
+			reg = <0x20000 0xd4000>;
 		};
 
 		tfm_storage_partition: partition@f4000 {
@@ -55,14 +55,14 @@
 };
 
 &sram0_s {
-	reg = <0x0 0x18000>;
+	reg = <0x0 0xc000>;
 };
 
 &sram0_ns {
-	reg = <0x18000 0x68000>;
-	ranges = <0x0 0x18000 0x68000>;
+	reg = <0xc000 0x74000>;
+	ranges = <0x0 0xc000 0x74000>;
 };
 
 &sram0_ns_app {
-	reg = <0x0 0x58000>;
+	reg = <0x0 0x64000>;
 };
